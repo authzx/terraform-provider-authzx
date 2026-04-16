@@ -1,0 +1,30 @@
+---
+page_title: "AuthzX Provider"
+description: "Manage AuthzX authorization resources — applications, subjects, resources, roles, and policies."
+---
+
+# AuthzX Provider
+
+The AuthzX provider lets you manage your authorization model as infrastructure as code. Create applications, define resource types, set up roles, and configure policies — all through Terraform.
+
+## Example Usage
+
+{{ tffile "examples/main.tf" }}
+
+## Authentication
+
+The provider authenticates using an API key. Set it in the provider block or via the `AUTHZX_API_KEY` environment variable.
+
+```hcl
+provider "authzx" {
+  api_key = "azx_..."
+}
+```
+
+Or:
+
+```bash
+export AUTHZX_API_KEY="azx_..."
+```
+
+{{ .SchemaMarkdown | trimspace }}

@@ -1,0 +1,19 @@
+terraform-provider-authzx
+.terraform/
+*.tfstate*
+
+# Local live-test fixtures — may contain real credentials
+test-live/.terraform.lock.hcl
+test-live/.terraform/
+test-live/terraform.tfstate*
+test-live/*.tfvars
+test-live/crash.*.log
+
+# GoReleaser output
+dist/
+
+# Editor/OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

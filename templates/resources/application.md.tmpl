@@ -1,0 +1,20 @@
+---
+page_title: "authzx_application Resource"
+description: "Manages an AuthzX application."
+---
+
+# authzx_application
+
+An application is a top-level container for your authorization model. All resource types, subjects, roles, and policies belong to an application.
+
+## Example Usage
+
+{{ tffile "examples/resources/authzx_application/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+Applications can be imported using their ID:
+
+{{ codefile "shell" "examples/resources/authzx_application/import.sh" }}
