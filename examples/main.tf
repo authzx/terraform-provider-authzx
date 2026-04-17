@@ -7,8 +7,20 @@ terraform {
 }
 
 provider "authzx" {
-  api_key = ""
-  # base_url = "https://api.authzx.com"  # default
+  # Credentials can also come from AUTHZX_CLIENT_ID / AUTHZX_CLIENT_SECRET env vars.
+  client_id     = var.authzx_client_id
+  client_secret = var.authzx_client_secret
+  # endpoint = "https://api.authzx.com"  # default; override for dev/staging
+}
+
+variable "authzx_client_id" {
+  type      = string
+  sensitive = false
+}
+
+variable "authzx_client_secret" {
+  type      = string
+  sensitive = true
 }
 
 # Create an application
@@ -83,4 +95,15 @@ resource "authzx_policy" "viewer_read_only" {
   effect         = "ALLOW"
   actions        = ["read"]
   resource_type  = "document"
+}
+
+# App-wide policy — protects all resources in the app
+resource "authzx_policy" "app_wide_read" {
+  application_id  = authzx_application.crm.id
+  name            = "app-wide-read"
+  description     = "Allow read on all resources in app"
+  effect          = "ALLOW"
+  priority        = 40
+  actions         = ["read"]
+  application_ids = [authzx_application.crm.id]
 }

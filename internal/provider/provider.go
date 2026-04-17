@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	"github.com/authzx/terraform-provider-authzx/internal/client"
@@ -12,11 +13,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+const defaultEndpoint = "https://api.authzx.com"
+
 type authzxProvider struct{}
 
 type authzxProviderModel struct {
-	APIKey  types.String `tfsdk:"api_key"`
-	BaseURL types.String `tfsdk:"base_url"`
+	ClientID     types.String `tfsdk:"client_id"`
+	ClientSecret types.String `tfsdk:"client_secret"`
+	Endpoint     types.String `tfsdk:"endpoint"`
 }
 
 func New() provider.Provider {
@@ -29,16 +33,22 @@ func (p *authzxProvider) Metadata(_ context.Context, _ provider.MetadataRequest,
 
 func (p *authzxProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage AuthzX authorization resources — applications, subjects, resources, roles, and policies.",
+		Description: "Manage AuthzX authorization resources — applications, subjects, resources, roles, and policies. " +
+			"Authenticates via OAuth2 Client Credentials (RFC 6749 §4.4).",
 		Attributes: map[string]schema.Attribute{
-			"api_key": schema.StringAttribute{
-				Description: "AuthzX API key. Can also be set via AUTHZX_API_KEY env var.",
+			"client_id": schema.StringAttribute{
+				Description: "AuthzX OAuth2 client ID. Can also be set via the AUTHZX_CLIENT_ID environment variable.",
+				Optional:    true,
+			},
+			"client_secret": schema.StringAttribute{
+				Description: "AuthzX OAuth2 client secret. Can also be set via the AUTHZX_CLIENT_SECRET environment variable.",
 				Optional:    true,
 				Sensitive:   true,
 			},
-			"base_url": schema.StringAttribute{
-				Description: "AuthzX API base URL. Defaults to https://api.authzx.com.",
-				Optional:    true,
+			"endpoint": schema.StringAttribute{
+				Description: "AuthzX API endpoint. Defaults to https://api.authzx.com. Useful for targeting dev/staging. " +
+					"Can also be set via the AUTHZX_ENDPOINT environment variable.",
+				Optional: true,
 			},
 		},
 	}
@@ -51,21 +61,58 @@ func (p *authzxProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
-	apiKey := config.APIKey.ValueString()
-	if apiKey == "" {
-		apiKey = os.Getenv("AUTHZX_API_KEY")
+	clientID := config.ClientID.ValueString()
+	if clientID == "" {
+		clientID = os.Getenv("AUTHZX_CLIENT_ID")
 	}
-	if apiKey == "" {
-		resp.Diagnostics.AddError("Missing API key", "Set api_key in the provider block or AUTHZX_API_KEY environment variable")
+	clientSecret := config.ClientSecret.ValueString()
+	if clientSecret == "" {
+		clientSecret = os.Getenv("AUTHZX_CLIENT_SECRET")
+	}
+
+	if clientID == "" {
+		resp.Diagnostics.AddError(
+			"Missing AuthzX client_id",
+			"Set client_id in the provider block or the AUTHZX_CLIENT_ID environment variable.",
+		)
+	}
+	if clientSecret == "" {
+		resp.Diagnostics.AddError(
+			"Missing AuthzX client_secret",
+			"Set client_secret in the provider block or the AUTHZX_CLIENT_SECRET environment variable.",
+		)
+	}
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	baseURL := "https://api.authzx.com"
-	if !config.BaseURL.IsNull() {
-		baseURL = config.BaseURL.ValueString()
+	endpoint := config.Endpoint.ValueString()
+	if endpoint == "" {
+		endpoint = os.Getenv("AUTHZX_ENDPOINT")
+	}
+	if endpoint == "" {
+		endpoint = defaultEndpoint
 	}
 
-	c := client.New(apiKey, baseURL)
+	c := client.New(clientID, clientSecret, endpoint)
+
+	// Exchange credentials up-front so misconfiguration fails at `terraform plan`
+	// rather than on the first resource CRUD.
+	if err := c.Authenticate(ctx); err != nil {
+		if errors.Is(err, client.ErrAuthentication) {
+			resp.Diagnostics.AddError(
+				"Authentication failed",
+				"Authentication failed: check client_id/client_secret. The token endpoint returned invalid_client.",
+			)
+			return
+		}
+		resp.Diagnostics.AddError(
+			"Failed to obtain access token",
+			"Could not exchange client credentials for an access token: "+err.Error(),
+		)
+		return
+	}
+
 	resp.DataSourceData = c
 	resp.ResourceData = c
 }

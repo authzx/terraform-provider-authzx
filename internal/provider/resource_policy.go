@@ -20,13 +20,15 @@ type policyResource struct {
 }
 
 type policyModel struct {
-	ID            types.String `tfsdk:"id"`
-	Name          types.String `tfsdk:"name"`
-	Description   types.String `tfsdk:"description"`
-	Effect        types.String `tfsdk:"effect"`
-	Resources     types.List   `tfsdk:"resources"`
-	Priority      types.Int64  `tfsdk:"priority"`
-	ApplicationID types.String `tfsdk:"application_id"`
+	ID             types.String `tfsdk:"id"`
+	Name           types.String `tfsdk:"name"`
+	Description    types.String `tfsdk:"description"`
+	Effect         types.String `tfsdk:"effect"`
+	Resources      types.List   `tfsdk:"resources"`
+	Priority       types.Int64  `tfsdk:"priority"`
+	ApplicationID  types.String `tfsdk:"application_id"`
+	Actions        types.List   `tfsdk:"actions"`
+	ApplicationIDs types.List   `tfsdk:"application_ids"`
 }
 
 type policyResourceRefModel struct {
@@ -65,8 +67,18 @@ func (r *policyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Required:    true,
 				Description: "Policy effect: ALLOW or DENY.",
 			},
+			"actions": schema.ListAttribute{
+				Optional:    true,
+				ElementType: types.StringType,
+				Description: "Policy-level actions (e.g., read, write, delete). Used for app-wide policies.",
+			},
+			"application_ids": schema.ListAttribute{
+				Optional:    true,
+				ElementType: types.StringType,
+				Description: "Application IDs this policy protects. All resources in these apps are covered.",
+			},
 			"resources": schema.ListNestedAttribute{
-				Required:    true,
+				Optional:    true,
 				Description: "Resources and actions this policy applies to.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -133,9 +145,26 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	resources, err := toClientResources(ctx, plan.Resources)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse resources", err.Error())
+	var resources []client.PolicyResourceRef
+	if !plan.Resources.IsNull() && !plan.Resources.IsUnknown() {
+		var err error
+		resources, err = toClientResources(ctx, plan.Resources)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to parse resources", err.Error())
+			return
+		}
+	}
+
+	var actions []string
+	if !plan.Actions.IsNull() {
+		resp.Diagnostics.Append(plan.Actions.ElementsAs(ctx, &actions, false)...)
+	}
+
+	appIDs := []string{plan.ApplicationID.ValueString()}
+	if !plan.ApplicationIDs.IsNull() {
+		resp.Diagnostics.Append(plan.ApplicationIDs.ElementsAs(ctx, &appIDs, false)...)
+	}
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -145,7 +174,8 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 		Effect:         plan.Effect.ValueString(),
 		Resources:      resources,
 		Priority:       int(plan.Priority.ValueInt64()),
-		ApplicationIDs: []string{plan.ApplicationID.ValueString()},
+		Actions:        actions,
+		ApplicationIDs: appIDs,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create policy", err.Error())
@@ -180,6 +210,24 @@ func (r *policyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	resp.Diagnostics.Append(diags...)
 	state.Resources = resourcesList
 
+	// Actions
+	if len(policy.Actions) > 0 {
+		actionsList, diags := types.ListValueFrom(ctx, types.StringType, policy.Actions)
+		resp.Diagnostics.Append(diags...)
+		state.Actions = actionsList
+	} else {
+		state.Actions = types.ListNull(types.StringType)
+	}
+
+	// Application IDs (protected apps)
+	if len(policy.ApplicationIDs) > 0 {
+		appIDsList, diags := types.ListValueFrom(ctx, types.StringType, policy.ApplicationIDs)
+		resp.Diagnostics.Append(diags...)
+		state.ApplicationIDs = appIDsList
+	} else {
+		state.ApplicationIDs = types.ListNull(types.StringType)
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -192,19 +240,37 @@ func (r *policyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	resources, err := toClientResources(ctx, plan.Resources)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse resources", err.Error())
+	var resources []client.PolicyResourceRef
+	if !plan.Resources.IsNull() && !plan.Resources.IsUnknown() {
+		var err error
+		resources, err = toClientResources(ctx, plan.Resources)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to parse resources", err.Error())
+			return
+		}
+	}
+
+	var actions []string
+	if !plan.Actions.IsNull() {
+		resp.Diagnostics.Append(plan.Actions.ElementsAs(ctx, &actions, false)...)
+	}
+
+	appIDs := []string{plan.ApplicationID.ValueString()}
+	if !plan.ApplicationIDs.IsNull() {
+		resp.Diagnostics.Append(plan.ApplicationIDs.ElementsAs(ctx, &appIDs, false)...)
+	}
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	_, err = r.client.UpdatePolicy(ctx, state.ID.ValueString(), &client.Policy{
+	_, err := r.client.UpdatePolicy(ctx, state.ID.ValueString(), &client.Policy{
 		Name:           plan.Name.ValueString(),
 		Description:    plan.Description.ValueString(),
 		Effect:         plan.Effect.ValueString(),
 		Resources:      resources,
 		Priority:       int(plan.Priority.ValueInt64()),
-		ApplicationIDs: []string{plan.ApplicationID.ValueString()},
+		Actions:        actions,
+		ApplicationIDs: appIDs,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update policy", err.Error())
@@ -237,14 +303,34 @@ func (r *policyResource) ImportState(ctx context.Context, req resource.ImportSta
 	resourcesList, diags := resourcesToList(ctx, policy.Resources)
 	resp.Diagnostics.Append(diags...)
 
+	var actionsList types.List
+	if len(policy.Actions) > 0 {
+		al, d := types.ListValueFrom(ctx, types.StringType, policy.Actions)
+		resp.Diagnostics.Append(d...)
+		actionsList = al
+	} else {
+		actionsList = types.ListNull(types.StringType)
+	}
+
+	var appIDsList types.List
+	if len(policy.ApplicationIDs) > 0 {
+		al, d := types.ListValueFrom(ctx, types.StringType, policy.ApplicationIDs)
+		resp.Diagnostics.Append(d...)
+		appIDsList = al
+	} else {
+		appIDsList = types.ListNull(types.StringType)
+	}
+
 	state := policyModel{
-		ID:            types.StringValue(policy.ID),
-		Name:          types.StringValue(policy.Name),
-		Description:   types.StringValue(policy.Description),
-		Effect:        types.StringValue(policy.Effect),
-		Resources:     resourcesList,
-		Priority:      types.Int64Value(int64(policy.Priority)),
-		ApplicationID: types.StringValue(firstOrEmpty(policy.ApplicationIDs)),
+		ID:             types.StringValue(policy.ID),
+		Name:           types.StringValue(policy.Name),
+		Description:    types.StringValue(policy.Description),
+		Effect:         types.StringValue(policy.Effect),
+		Resources:      resourcesList,
+		Priority:       types.Int64Value(int64(policy.Priority)),
+		ApplicationID:  types.StringValue(firstOrEmpty(policy.ApplicationIDs)),
+		Actions:        actionsList,
+		ApplicationIDs: appIDsList,
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

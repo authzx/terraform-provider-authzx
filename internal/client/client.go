@@ -4,27 +4,160 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
+	"sync"
 	"time"
 )
 
+// ErrAuthentication is returned when the token endpoint rejects the client
+// credentials. The provider surfaces this as a diagnostic rather than a raw
+// transport error.
+var ErrAuthentication = errors.New("authentication failed: check client_id/client_secret")
+
+// tokenRefreshLeeway is how close to expiry we refresh proactively.
+const tokenRefreshLeeway = 60 * time.Second
+
+// Client is an authenticated HTTP client for the AuthzX API. It acquires an
+// access token via the OAuth2 Client Credentials flow (RFC 6749 §4.4) and
+// transparently refreshes it on expiry or on a 401 response.
 type Client struct {
-	apiKey     string
-	baseURL    string
-	httpClient *http.Client
+	clientID     string
+	clientSecret string
+	baseURL      string
+	httpClient   *http.Client
+
+	mu          sync.Mutex
+	accessToken string
+	expiresAt   time.Time
 }
 
-func New(apiKey, baseURL string) *Client {
+// New constructs a Client. The token is not fetched here — it is obtained
+// lazily on the first API call (or via Authenticate() to surface credential
+// errors at provider configure time).
+func New(clientID, clientSecret, baseURL string) *Client {
 	return &Client{
-		apiKey:     apiKey,
-		baseURL:    baseURL,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		clientID:     clientID,
+		clientSecret: clientSecret,
+		baseURL:      strings.TrimRight(baseURL, "/"),
+		httpClient:   &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
+// tokenResponse models a successful OAuth2 token endpoint response.
+type tokenResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+	Scope       string `json:"scope"`
+}
+
+// tokenErrorResponse models an OAuth2 token endpoint error response (RFC 6749 §5.2).
+type tokenErrorResponse struct {
+	Error            string `json:"error"`
+	ErrorDescription string `json:"error_description,omitempty"`
+}
+
+// Authenticate forces a token exchange. Call this at provider Configure() time
+// to fail fast on bad credentials.
+func (c *Client) Authenticate(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.refreshTokenLocked(ctx)
+}
+
+// token returns a valid access token, refreshing if within the leeway of expiry.
+func (c *Client) token(ctx context.Context) (string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.accessToken != "" && time.Until(c.expiresAt) > tokenRefreshLeeway {
+		return c.accessToken, nil
+	}
+	if err := c.refreshTokenLocked(ctx); err != nil {
+		return "", err
+	}
+	return c.accessToken, nil
+}
+
+// refreshTokenLocked performs the client_credentials grant. Caller must hold c.mu.
+func (c *Client) refreshTokenLocked(ctx context.Context) error {
+	form := url.Values{}
+	form.Set("grant_type", "client_credentials")
+	form.Set("client_id", c.clientID)
+	form.Set("client_secret", c.clientSecret)
+
+	req, err := http.NewRequestWithContext(
+		ctx, http.MethodPost,
+		c.baseURL+"/identity-srv/v1/oauth/token",
+		strings.NewReader(form.Encode()),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to build token request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("token request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read token response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return ErrAuthentication
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var tErr tokenErrorResponse
+		if jsonErr := json.Unmarshal(body, &tErr); jsonErr == nil && tErr.Error != "" {
+			if tErr.Error == "invalid_client" {
+				return ErrAuthentication
+			}
+			return fmt.Errorf("token endpoint error (status %d): %s %s", resp.StatusCode, tErr.Error, tErr.ErrorDescription)
+		}
+		return fmt.Errorf("token endpoint error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var tok tokenResponse
+	if err := json.Unmarshal(body, &tok); err != nil {
+		return fmt.Errorf("failed to parse token response: %w", err)
+	}
+	if tok.AccessToken == "" {
+		return fmt.Errorf("token endpoint returned empty access_token")
+	}
+
+	c.accessToken = tok.AccessToken
+	// Fall back to 1h if the server omits expires_in.
+	if tok.ExpiresIn > 0 {
+		c.expiresAt = time.Now().Add(time.Duration(tok.ExpiresIn) * time.Second)
+	} else {
+		c.expiresAt = time.Now().Add(time.Hour)
+	}
+	return nil
+}
+
+// invalidateToken clears the cached token so the next call forces a refresh.
+// Used when the API returns 401 on a non-token request (token likely revoked).
+func (c *Client) invalidateToken() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.accessToken = ""
+	c.expiresAt = time.Time{}
+}
+
 func (c *Client) do(ctx context.Context, method, path string, body interface{}, result interface{}) error {
+	return c.doWithRetry(ctx, method, path, body, result, true)
+}
+
+func (c *Client) doWithRetry(ctx context.Context, method, path string, body interface{}, result interface{}, retryOn401 bool) error {
 	var reqBody io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -34,12 +167,18 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 		reqBody = bytes.NewReader(data)
 	}
 
+	tok, err := c.token(ctx)
+	if err != nil {
+		return err
+	}
+
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reqBody)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Authorization", "Bearer "+tok)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -52,11 +191,17 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
+	// If the server rejected our token, invalidate and retry once with a fresh one.
+	if resp.StatusCode == http.StatusUnauthorized && retryOn401 {
+		c.invalidateToken()
+		return c.doWithRetry(ctx, method, path, body, result, false)
+	}
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
 	}
 
-	if result != nil {
+	if result != nil && len(respBody) > 0 {
 		if err := json.Unmarshal(respBody, result); err != nil {
 			return fmt.Errorf("failed to parse response: %w", err)
 		}
@@ -259,6 +404,7 @@ type Policy struct {
 	Effect         string              `json:"effect"`
 	Resources      []PolicyResourceRef `json:"resources"`
 	Priority       int                 `json:"priority,omitempty"`
+	Actions        []string            `json:"actions,omitempty"`
 	ApplicationIDs []string            `json:"application_ids,omitempty"`
 }
 
@@ -292,6 +438,20 @@ func (c *Client) GetPolicy(ctx context.Context, id string) (*Policy, error) {
 			}
 		}
 		result.Resources = refs
+	}
+
+	// The primary endpoint also does not return application_ids (the field is
+	// json:"-" on the backend model). Fetch from the dedicated endpoint.
+	type policyAppResp struct {
+		ApplicationID string `json:"application_id"`
+	}
+	var apps []policyAppResp
+	if err := c.do(ctx, "GET", "/policy-srv/v1/policies/"+id+"/applications", nil, &apps); err == nil {
+		ids := make([]string, len(apps))
+		for i, a := range apps {
+			ids[i] = a.ApplicationID
+		}
+		result.ApplicationIDs = ids
 	}
 
 	return &result, nil
