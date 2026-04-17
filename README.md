@@ -11,13 +11,13 @@ terraform {
   required_providers {
     authzx = {
       source  = "authzx/authzx"
-      version = "~> 0.1"
+      version = "~> 0.2"
     }
   }
 }
 
 provider "authzx" {
-  api_key = var.authzx_api_key
+  # Credentials read from AUTHZX_CLIENT_ID / AUTHZX_CLIENT_SECRET env vars.
 }
 ```
 
@@ -25,14 +25,26 @@ Run `terraform init` to download the provider.
 
 ## Authentication
 
-The provider accepts an API key via the `api_key` attribute or the `AUTHZX_API_KEY` environment variable. Generate an API key from the AuthzX console (Settings → API Keys). Keys are prefixed with `azx_`.
+The provider uses the OAuth 2.0 Client Credentials flow. Create an OAuth client from the AuthzX console (**Settings → API → OAuth Clients**). Client secrets are prefixed with `azx_cs_`.
+
+The simplest setup — export env vars and leave the provider block empty:
+
+```bash
+export AUTHZX_CLIENT_ID="client_..."
+export AUTHZX_CLIENT_SECRET="azx_cs_..."
+```
+
+Or set them explicitly in the provider block:
 
 ```hcl
 provider "authzx" {
-  api_key  = "azx_..."                  # or use AUTHZX_API_KEY env var
-  base_url = "https://api.authzx.com"   # optional; defaults to the AuthzX cloud
+  client_id     = "client_..."
+  client_secret = "azx_cs_..."
+  # endpoint    = "https://api.authzx.com"   # optional; or AUTHZX_ENDPOINT env var
 }
 ```
+
+The provider exchanges credentials for a short-lived access token at startup and refreshes automatically before expiry.
 
 ## Quick example
 
