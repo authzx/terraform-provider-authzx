@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/authzx/terraform-provider-authzx/internal/client"
@@ -29,11 +30,23 @@ type policyModel struct {
 	ApplicationID  types.String `tfsdk:"application_id"`
 	Actions        types.List   `tfsdk:"actions"`
 	ApplicationIDs types.List   `tfsdk:"application_ids"`
+	Conditions     types.List   `tfsdk:"conditions"`
 }
 
 type policyResourceRefModel struct {
 	ResourceID types.String `tfsdk:"resource_id"`
 	Actions    types.List   `tfsdk:"actions"`
+}
+
+// policyConditionModel mirrors client.PolicyCondition. Value is surfaced as a
+// JSON-encoded string because the underlying value is polymorphic (number,
+// string, bool, array) and a single TF attribute type can't express that
+// cleanly without types.Dynamic. Users write `value_json = jsonencode(100)`.
+type policyConditionModel struct {
+	Type      types.String `tfsdk:"type"`
+	Field     types.String `tfsdk:"field"`
+	Operator  types.String `tfsdk:"operator"`
+	ValueJSON types.String `tfsdk:"value_json"`
 }
 
 func NewPolicyResource() resource.Resource {
@@ -106,6 +119,30 @@ func (r *policyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Required:    true,
 				Description: "Application this policy belongs to.",
 			},
+			"conditions": schema.ListNestedAttribute{
+				Optional:    true,
+				Description: "Structured ABAC conditions evaluated when this policy matches. All conditions must pass (AND semantics). Applies to both ALLOW and DENY policies.",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"type": schema.StringAttribute{
+							Required:    true,
+							Description: "Condition type: resource_attribute, subject_attribute, timeOfDay, ipAddress, geolocation, environment.",
+						},
+						"field": schema.StringAttribute{
+							Optional:    true,
+							Description: "Attribute key (for resource_attribute and subject_attribute types). The condition reads input.{resource|subject}.attributes.<field>.",
+						},
+						"operator": schema.StringAttribute{
+							Required:    true,
+							Description: "Comparison operator. For *_attribute types: eq, neq, lt, gt, lte, gte, in. For other types: see docs.",
+						},
+						"value_json": schema.StringAttribute{
+							Required:    true,
+							Description: "Comparison value, JSON-encoded. Use jsonencode(100) for numbers, jsonencode(\"finance\") for strings, jsonencode([\"a\", \"b\"]) for lists — polymorphic to match the Rego evaluator's value slot.",
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -114,6 +151,72 @@ func (r *policyResource) Configure(_ context.Context, req resource.ConfigureRequ
 	if req.ProviderData != nil {
 		r.client = req.ProviderData.(*client.Client)
 	}
+}
+
+// toClientConditions converts the TF-side conditions list into the client's
+// []PolicyCondition. value_json strings are decoded as json.RawMessage so the
+// polymorphic value (number, string, bool, array) round-trips to the backend.
+func toClientConditions(ctx context.Context, l types.List) ([]client.PolicyCondition, error) {
+	if l.IsNull() || l.IsUnknown() {
+		return nil, nil
+	}
+	var items []policyConditionModel
+	diags := l.ElementsAs(ctx, &items, false)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to parse conditions: %s", diags.Errors())
+	}
+	out := make([]client.PolicyCondition, len(items))
+	for i, c := range items {
+		raw := c.ValueJSON.ValueString()
+		if raw == "" {
+			raw = "null"
+		}
+		// Validate it's well-formed JSON now so we fail at plan rather than a
+		// confusing 500 from the backend later.
+		if !json.Valid([]byte(raw)) {
+			return nil, fmt.Errorf("conditions[%d].value_json is not valid JSON: %s", i, raw)
+		}
+		out[i] = client.PolicyCondition{
+			Type:     c.Type.ValueString(),
+			Field:    c.Field.ValueString(),
+			Operator: c.Operator.ValueString(),
+			Value:    json.RawMessage(raw),
+		}
+	}
+	return out, nil
+}
+
+// conditionsToList converts the client's []PolicyCondition back into a TF list
+// for Read. Preserves the value's JSON shape exactly.
+func conditionsToList(ctx context.Context, conds []client.PolicyCondition) (types.List, diag.Diagnostics) {
+	attrTypes := map[string]attr.Type{
+		"type":       types.StringType,
+		"field":      types.StringType,
+		"operator":   types.StringType,
+		"value_json": types.StringType,
+	}
+	objType := types.ObjectType{AttrTypes: attrTypes}
+	if len(conds) == 0 {
+		return types.ListNull(objType), nil
+	}
+	items := make([]policyConditionModel, len(conds))
+	for i, c := range conds {
+		field := types.StringNull()
+		if c.Field != "" {
+			field = types.StringValue(c.Field)
+		}
+		valueJSON := "null"
+		if len(c.Value) > 0 {
+			valueJSON = string(c.Value)
+		}
+		items[i] = policyConditionModel{
+			Type:      types.StringValue(c.Type),
+			Field:     field,
+			Operator:  types.StringValue(c.Operator),
+			ValueJSON: types.StringValue(valueJSON),
+		}
+	}
+	return types.ListValueFrom(ctx, objType, items)
 }
 
 func toClientResources(ctx context.Context, l types.List) ([]client.PolicyResourceRef, error) {
@@ -168,6 +271,12 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
+	conditions, err := toClientConditions(ctx, plan.Conditions)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to parse conditions", err.Error())
+		return
+	}
+
 	policy, err := r.client.CreatePolicy(ctx, &client.Policy{
 		Name:           plan.Name.ValueString(),
 		Description:    plan.Description.ValueString(),
@@ -176,6 +285,7 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 		Priority:       int(plan.Priority.ValueInt64()),
 		Actions:        actions,
 		ApplicationIDs: appIDs,
+		Conditions:     conditions,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create policy", err.Error())
@@ -228,6 +338,11 @@ func (r *policyResource) Read(ctx context.Context, req resource.ReadRequest, res
 		state.ApplicationIDs = types.ListNull(types.StringType)
 	}
 
+	// Conditions — polymorphic value, stored as value_json per element.
+	conditionsList, diags := conditionsToList(ctx, policy.Conditions)
+	resp.Diagnostics.Append(diags...)
+	state.Conditions = conditionsList
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -263,7 +378,13 @@ func (r *policyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	_, err := r.client.UpdatePolicy(ctx, state.ID.ValueString(), &client.Policy{
+	conditions, err := toClientConditions(ctx, plan.Conditions)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to parse conditions", err.Error())
+		return
+	}
+
+	_, err = r.client.UpdatePolicy(ctx, state.ID.ValueString(), &client.Policy{
 		Name:           plan.Name.ValueString(),
 		Description:    plan.Description.ValueString(),
 		Effect:         plan.Effect.ValueString(),
@@ -271,6 +392,7 @@ func (r *policyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		Priority:       int(plan.Priority.ValueInt64()),
 		Actions:        actions,
 		ApplicationIDs: appIDs,
+		Conditions:     conditions,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update policy", err.Error())

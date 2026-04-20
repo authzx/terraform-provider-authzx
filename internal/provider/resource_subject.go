@@ -21,6 +21,7 @@ type subjectModel struct {
 	Name          types.String `tfsdk:"name"`
 	Type          types.String `tfsdk:"type"`
 	ApplicationID types.String `tfsdk:"application_id"`
+	ExternalID    types.String `tfsdk:"external_id"`
 }
 
 func NewSubjectResource() resource.Resource {
@@ -53,6 +54,10 @@ func (r *subjectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"application_id": schema.StringAttribute{
 				Required:    true,
 				Description: "Application this subject belongs to.",
+			},
+			"external_id": schema.StringAttribute{
+				Optional:    true,
+				Description: "Your system's reference ID for this subject. Usable in /v1/authorize as an alternative to the subject's UUID.",
 			},
 		},
 	}
@@ -92,6 +97,7 @@ func (r *subjectResource) Create(ctx context.Context, req resource.CreateRequest
 		Name:           plan.Name.ValueString(),
 		Type:           plan.Type.ValueString(),
 		ApplicationIDs: []string{plan.ApplicationID.ValueString()},
+		ExternalID:     plan.ExternalID.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create subject", err.Error())
@@ -117,6 +123,7 @@ func (r *subjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	state.Name = types.StringValue(s.Name)
 	state.Type = types.StringValue(s.Type)
+	state.ExternalID = stringOrNull(s.ExternalID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -133,6 +140,7 @@ func (r *subjectResource) Update(ctx context.Context, req resource.UpdateRequest
 		Name:           plan.Name.ValueString(),
 		Type:           plan.Type.ValueString(),
 		ApplicationIDs: []string{plan.ApplicationID.ValueString()},
+		ExternalID:     plan.ExternalID.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update subject", err.Error())
@@ -167,6 +175,7 @@ func (r *subjectResource) ImportState(ctx context.Context, req resource.ImportSt
 		Name:          types.StringValue(s.Name),
 		Type:          types.StringValue(s.Type),
 		ApplicationID: types.StringValue(firstOrEmpty(s.ApplicationIDs)),
+		ExternalID:    stringOrNull(s.ExternalID),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

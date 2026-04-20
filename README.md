@@ -1,6 +1,6 @@
 # AuthzX Terraform Provider
 
-Terraform provider for [AuthzX](https://authzx.com) — manage applications, resources, subjects, roles, groups, and policies as infrastructure as code.
+Terraform provider for [AuthzX](https://authzx.com) — manage applications, resources, subjects, roles, groups and policies as infrastructure as code.
 
 Requires Terraform 1.0+.
 

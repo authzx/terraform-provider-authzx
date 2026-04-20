@@ -311,6 +311,10 @@ type Subject struct {
 	Name           string   `json:"name"`
 	Type           string   `json:"type"`
 	ApplicationIDs []string `json:"application_ids,omitempty"`
+	// ExternalID is the customer's own identifier for the subject (e.g., a
+	// user ID from their auth system). Scoped uniquely by (tenant, external_id)
+	// and usable in /v1/authorize as an alternative to the UUID.
+	ExternalID string `json:"external_id,omitempty"`
 }
 
 func (c *Client) CreateSubject(ctx context.Context, s *Subject) (*Subject, error) {
@@ -397,6 +401,22 @@ type PolicyResourceRef struct {
 	Actions    []string `json:"actions"`
 }
 
+// PolicyCondition is one structured entry inside a policy's conditions array.
+// The backend stores conditions as a JSONB blob; this shape matches what the
+// Rego evaluator (resources/authz.rego) reads:
+//   { type: "resource_attribute" | "subject_attribute" | "timeOfDay" | "ipAddress" | ... ,
+//     field: "<attribute-path>",   (only for *_attribute types)
+//     operator: "eq"|"neq"|"lt"|"gt"|"lte"|"gte"|"in"|"between"|"after"|"before"|... ,
+//     value: <polymorphic — scalar OR list depending on operator> }
+// Because the value is polymorphic, the TF provider surfaces it as a
+// JSON-encoded string (ValueJSON) and (de)serializes transparently.
+type PolicyCondition struct {
+	Type     string          `json:"type"`
+	Field    string          `json:"field,omitempty"`
+	Operator string          `json:"operator"`
+	Value    json.RawMessage `json:"value"`
+}
+
 type Policy struct {
 	ID             string              `json:"id"`
 	Name           string              `json:"name"`
@@ -406,6 +426,7 @@ type Policy struct {
 	Priority       int                 `json:"priority,omitempty"`
 	Actions        []string            `json:"actions,omitempty"`
 	ApplicationIDs []string            `json:"application_ids,omitempty"`
+	Conditions     []PolicyCondition   `json:"conditions,omitempty"`
 }
 
 func (c *Client) CreatePolicy(ctx context.Context, p *Policy) (*Policy, error) {
