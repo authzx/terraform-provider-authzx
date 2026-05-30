@@ -22,8 +22,8 @@ resource "authzx_role" "editor" {
 
 ### Required
 
-- `application_id` (String) Application this role belongs to.
 - `name` (String) Role name (e.g., admin, editor, viewer).
+- `namespace_id` (String) Namespace this role belongs to.
 
 ### Optional
 

@@ -22,9 +22,13 @@ resource "authzx_subject" "alice" {
 
 ### Required
 
-- `application_id` (String) Application this subject belongs to.
 - `name` (String) Subject name.
+- `namespace_id` (String) Namespace this subject belongs to.
 - `type` (String) Subject type (e.g., user, service, device).
+
+### Optional
+
+- `external_id` (String) Your system's reference ID for this subject. Usable in /v1/authorize as an alternative to the subject's UUID.
 
 ### Read-Only
 

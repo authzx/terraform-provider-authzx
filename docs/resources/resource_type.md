@@ -24,8 +24,8 @@ resource "authzx_resource_type" "document" {
 ### Required
 
 - `actions` (List of String) Available actions (e.g., read, write, delete).
-- `application_id` (String) Application this resource type belongs to.
 - `name` (String) Resource type name (e.g., document, api-endpoint).
+- `namespace_id` (String) Namespace this resource type belongs to.
 
 ### Optional
 

@@ -26,20 +26,44 @@ resource "authzx_policy" "editors_can_edit" {
 
 ### Required
 
-- `actions` (List of String) Actions this policy applies to.
-- `application_id` (String) Application this policy belongs to.
+- `description` (String) Policy description.
 - `effect` (String) Policy effect: ALLOW or DENY.
 - `name` (String) Policy name.
+- `namespace_id` (String) Namespace this policy belongs to.
 
 ### Optional
 
-- `description` (String) Policy description.
+- `actions` (List of String) Policy-level actions (e.g., read, write, delete). Used for app-wide policies.
+- `conditions` (Attributes List) Structured ABAC conditions evaluated when this policy matches. All conditions must pass (AND semantics). Applies to both ALLOW and DENY policies. (see [below for nested schema](#nestedatt--conditions))
+- `namespace_ids` (List of String) Namespace IDs this policy protects. All resources in these namespaces are covered.
 - `priority` (Number) Policy priority (0-100). Higher priority policies are evaluated first.
-- `resource_type` (String) Resource type this policy applies to.
+- `resources` (Attributes List) Resources and actions this policy applies to. (see [below for nested schema](#nestedatt--resources))
 
 ### Read-Only
 
 - `id` (String) Policy ID.
+
+<a id="nestedatt--conditions"></a>
+### Nested Schema for `conditions`
+
+Required:
+
+- `operator` (String) Comparison operator. For *_attribute types: eq, neq, lt, gt, lte, gte, in. For other types: see docs.
+- `type` (String) Condition type: resource_attribute, subject_attribute, timeOfDay, ipAddress, geolocation, environment.
+- `value_json` (String) Comparison value, JSON-encoded. Use jsonencode(100) for numbers, jsonencode("finance") for strings, jsonencode(["a", "b"]) for lists — polymorphic to match the Rego evaluator's value slot.
+
+Optional:
+
+- `field` (String) Attribute key (for resource_attribute and subject_attribute types). The condition reads input.{resource|subject}.attributes.<field>.
+
+
+<a id="nestedatt--resources"></a>
+### Nested Schema for `resources`
+
+Required:
+
+- `actions` (List of String) Actions allowed/denied on this resource.
+- `resource_id` (String) Resource ID.
 
 ## Import
 
