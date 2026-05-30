@@ -27,9 +27,9 @@ type policyModel struct {
 	Effect         types.String `tfsdk:"effect"`
 	Resources      types.List   `tfsdk:"resources"`
 	Priority       types.Int64  `tfsdk:"priority"`
-	ApplicationID  types.String `tfsdk:"application_id"`
-	Actions        types.List   `tfsdk:"actions"`
-	ApplicationIDs types.List   `tfsdk:"application_ids"`
+	NamespaceID  types.String `tfsdk:"namespace_id"`
+	Actions      types.List   `tfsdk:"actions"`
+	NamespaceIDs types.List   `tfsdk:"namespace_ids"`
 	Conditions     types.List   `tfsdk:"conditions"`
 }
 
@@ -85,10 +85,10 @@ func (r *policyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				ElementType: types.StringType,
 				Description: "Policy-level actions (e.g., read, write, delete). Used for app-wide policies.",
 			},
-			"application_ids": schema.ListAttribute{
+			"namespace_ids": schema.ListAttribute{
 				Optional:    true,
 				ElementType: types.StringType,
-				Description: "Application IDs this policy protects. All resources in these apps are covered.",
+				Description: "Namespace IDs this policy protects. All resources in these namespaces are covered.",
 			},
 			"resources": schema.ListNestedAttribute{
 				Optional:    true,
@@ -115,9 +115,9 @@ func (r *policyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
-			"application_id": schema.StringAttribute{
+			"namespace_id": schema.StringAttribute{
 				Required:    true,
-				Description: "Application this policy belongs to.",
+				Description: "Namespace this policy belongs to.",
 			},
 			"conditions": schema.ListNestedAttribute{
 				Optional:    true,
@@ -263,9 +263,9 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 		resp.Diagnostics.Append(plan.Actions.ElementsAs(ctx, &actions, false)...)
 	}
 
-	appIDs := []string{plan.ApplicationID.ValueString()}
-	if !plan.ApplicationIDs.IsNull() {
-		resp.Diagnostics.Append(plan.ApplicationIDs.ElementsAs(ctx, &appIDs, false)...)
+	appIDs := []string{plan.NamespaceID.ValueString()}
+	if !plan.NamespaceIDs.IsNull() {
+		resp.Diagnostics.Append(plan.NamespaceIDs.ElementsAs(ctx, &appIDs, false)...)
 	}
 	if resp.Diagnostics.HasError() {
 		return
@@ -329,13 +329,13 @@ func (r *policyResource) Read(ctx context.Context, req resource.ReadRequest, res
 		state.Actions = types.ListNull(types.StringType)
 	}
 
-	// Application IDs (protected apps)
+	// Namespace IDs (protected namespaces)
 	if len(policy.ApplicationIDs) > 0 {
 		appIDsList, diags := types.ListValueFrom(ctx, types.StringType, policy.ApplicationIDs)
 		resp.Diagnostics.Append(diags...)
-		state.ApplicationIDs = appIDsList
+		state.NamespaceIDs = appIDsList
 	} else {
-		state.ApplicationIDs = types.ListNull(types.StringType)
+		state.NamespaceIDs = types.ListNull(types.StringType)
 	}
 
 	// Conditions — polymorphic value, stored as value_json per element.
@@ -370,9 +370,9 @@ func (r *policyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		resp.Diagnostics.Append(plan.Actions.ElementsAs(ctx, &actions, false)...)
 	}
 
-	appIDs := []string{plan.ApplicationID.ValueString()}
-	if !plan.ApplicationIDs.IsNull() {
-		resp.Diagnostics.Append(plan.ApplicationIDs.ElementsAs(ctx, &appIDs, false)...)
+	appIDs := []string{plan.NamespaceID.ValueString()}
+	if !plan.NamespaceIDs.IsNull() {
+		resp.Diagnostics.Append(plan.NamespaceIDs.ElementsAs(ctx, &appIDs, false)...)
 	}
 	if resp.Diagnostics.HasError() {
 		return
@@ -434,25 +434,25 @@ func (r *policyResource) ImportState(ctx context.Context, req resource.ImportSta
 		actionsList = types.ListNull(types.StringType)
 	}
 
-	var appIDsList types.List
+	var nsIDsList types.List
 	if len(policy.ApplicationIDs) > 0 {
 		al, d := types.ListValueFrom(ctx, types.StringType, policy.ApplicationIDs)
 		resp.Diagnostics.Append(d...)
-		appIDsList = al
+		nsIDsList = al
 	} else {
-		appIDsList = types.ListNull(types.StringType)
+		nsIDsList = types.ListNull(types.StringType)
 	}
 
 	state := policyModel{
-		ID:             types.StringValue(policy.ID),
-		Name:           types.StringValue(policy.Name),
-		Description:    types.StringValue(policy.Description),
-		Effect:         types.StringValue(policy.Effect),
-		Resources:      resourcesList,
-		Priority:       types.Int64Value(int64(policy.Priority)),
-		ApplicationID:  types.StringValue(firstOrEmpty(policy.ApplicationIDs)),
-		Actions:        actionsList,
-		ApplicationIDs: appIDsList,
+		ID:           types.StringValue(policy.ID),
+		Name:         types.StringValue(policy.Name),
+		Description:  types.StringValue(policy.Description),
+		Effect:       types.StringValue(policy.Effect),
+		Resources:    resourcesList,
+		Priority:     types.Int64Value(int64(policy.Priority)),
+		NamespaceID:  types.StringValue(firstOrEmpty(policy.ApplicationIDs)),
+		Actions:      actionsList,
+		NamespaceIDs: nsIDsList,
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

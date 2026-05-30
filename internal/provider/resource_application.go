@@ -12,107 +12,107 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type applicationResource struct {
+type namespaceResource struct {
 	client *client.Client
 }
 
-type applicationModel struct {
+type namespaceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
 }
 
-func NewApplicationResource() resource.Resource {
-	return &applicationResource{}
+func NewNamespaceResource() resource.Resource {
+	return &namespaceResource{}
 }
 
-func (r *applicationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_application"
+func (r *namespaceResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_namespace"
 }
 
-func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *namespaceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages an AuthzX application.",
+		Description: "Manages an AuthzX namespace.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:    true,
-				Description: "Application ID.",
+				Description: "Namespace ID.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
 				Required:    true,
-				Description: "Application name.",
+				Description: "Namespace name.",
 			},
 			"description": schema.StringAttribute{
 				Optional:    true,
-				Description: "Application description.",
+				Description: "Namespace description.",
 			},
 		},
 	}
 }
 
-func (r *applicationResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
+func (r *namespaceResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
 	if req.ProviderData != nil {
 		r.client = req.ProviderData.(*client.Client)
 	}
 }
 
-func (r *applicationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan applicationModel
+func (r *namespaceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan namespaceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	app, err := r.client.CreateApplication(ctx, &client.Application{
+	ns, err := r.client.CreateNamespace(ctx, &client.Namespace{
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create application", err.Error())
+		resp.Diagnostics.AddError("Failed to create namespace", err.Error())
 		return
 	}
 
-	plan.ID = types.StringValue(app.ID)
+	plan.ID = types.StringValue(ns.ID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *applicationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state applicationModel
+func (r *namespaceResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state namespaceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	app, err := r.client.GetApplication(ctx, state.ID.ValueString())
+	ns, err := r.client.GetNamespace(ctx, state.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to read application", err.Error())
+		resp.Diagnostics.AddError("Failed to read namespace", err.Error())
 		return
 	}
 
-	state.Name = types.StringValue(app.Name)
-	state.Description = stringOrNull(app.Description)
+	state.Name = types.StringValue(ns.Name)
+	state.Description = stringOrNull(ns.Description)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *applicationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan applicationModel
+func (r *namespaceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan namespaceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var state applicationModel
+	var state namespaceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
-	_, err := r.client.UpdateApplication(ctx, state.ID.ValueString(), &client.Application{
+	_, err := r.client.UpdateNamespace(ctx, state.ID.ValueString(), &client.Namespace{
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to update application", err.Error())
+		resp.Diagnostics.AddError("Failed to update namespace", err.Error())
 		return
 	}
 
@@ -120,29 +120,29 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *applicationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state applicationModel
+func (r *namespaceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state namespaceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if err := r.client.DeleteApplication(ctx, state.ID.ValueString()); err != nil {
-		resp.Diagnostics.AddError("Failed to delete application", err.Error())
+	if err := r.client.DeleteNamespace(ctx, state.ID.ValueString()); err != nil {
+		resp.Diagnostics.AddError("Failed to delete namespace", err.Error())
 	}
 }
 
-func (r *applicationResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	app, err := r.client.GetApplication(ctx, req.ID)
+func (r *namespaceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	ns, err := r.client.GetNamespace(ctx, req.ID)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to import application", fmt.Sprintf("Could not find application %s: %s", req.ID, err.Error()))
+		resp.Diagnostics.AddError("Failed to import namespace", fmt.Sprintf("Could not find namespace %s: %s", req.ID, err.Error()))
 		return
 	}
 
-	state := applicationModel{
-		ID:          types.StringValue(app.ID),
-		Name:        types.StringValue(app.Name),
-		Description: stringOrNull(app.Description),
+	state := namespaceModel{
+		ID:          types.StringValue(ns.ID),
+		Name:        types.StringValue(ns.Name),
+		Description: stringOrNull(ns.Description),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

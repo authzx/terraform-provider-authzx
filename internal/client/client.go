@@ -92,7 +92,7 @@ func (c *Client) refreshTokenLocked(ctx context.Context) error {
 
 	req, err := http.NewRequestWithContext(
 		ctx, http.MethodPost,
-		c.baseURL+"/identity-srv/v1/oauth/token",
+		c.baseURL+"/v1/oauth/token",
 		strings.NewReader(form.Encode()),
 	)
 	if err != nil {
@@ -210,32 +210,32 @@ func (c *Client) doWithRetry(ctx context.Context, method, path string, body inte
 	return nil
 }
 
-type Application struct {
+type Namespace struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 }
 
-func (c *Client) CreateApplication(ctx context.Context, app *Application) (*Application, error) {
-	var result Application
-	err := c.do(ctx, "POST", "/application-srv/v1/applications", app, &result)
+func (c *Client) CreateNamespace(ctx context.Context, ns *Namespace) (*Namespace, error) {
+	var result Namespace
+	err := c.do(ctx, "POST", "/v1/namespaces", ns, &result)
 	return &result, err
 }
 
-func (c *Client) GetApplication(ctx context.Context, id string) (*Application, error) {
-	var result Application
-	err := c.do(ctx, "GET", "/application-srv/v1/applications/"+id, nil, &result)
+func (c *Client) GetNamespace(ctx context.Context, id string) (*Namespace, error) {
+	var result Namespace
+	err := c.do(ctx, "GET", "/v1/namespaces/"+id, nil, &result)
 	return &result, err
 }
 
-func (c *Client) UpdateApplication(ctx context.Context, id string, app *Application) (*Application, error) {
-	var result Application
-	err := c.do(ctx, "PUT", "/application-srv/v1/applications/"+id, app, &result)
+func (c *Client) UpdateNamespace(ctx context.Context, id string, ns *Namespace) (*Namespace, error) {
+	var result Namespace
+	err := c.do(ctx, "PUT", "/v1/namespaces/"+id, ns, &result)
 	return &result, err
 }
 
-func (c *Client) DeleteApplication(ctx context.Context, id string) error {
-	return c.do(ctx, "DELETE", "/application-srv/v1/applications/"+id, nil, nil)
+func (c *Client) DeleteNamespace(ctx context.Context, id string) error {
+	return c.do(ctx, "DELETE", "/v1/namespaces/"+id, nil, nil)
 }
 
 type Action struct {
@@ -255,24 +255,24 @@ type ResourceType struct {
 
 func (c *Client) CreateResourceType(ctx context.Context, rt *ResourceType) (*ResourceType, error) {
 	var result ResourceType
-	err := c.do(ctx, "POST", "/resource-srv/v1/resource-types", rt, &result)
+	err := c.do(ctx, "POST", "/v1/resource-types", rt, &result)
 	return &result, err
 }
 
 func (c *Client) GetResourceType(ctx context.Context, id string) (*ResourceType, error) {
 	var result ResourceType
-	err := c.do(ctx, "GET", "/resource-srv/v1/resource-types/"+id, nil, &result)
+	err := c.do(ctx, "GET", "/v1/resource-types/"+id, nil, &result)
 	return &result, err
 }
 
 func (c *Client) UpdateResourceType(ctx context.Context, id string, rt *ResourceType) (*ResourceType, error) {
 	var result ResourceType
-	err := c.do(ctx, "PUT", "/resource-srv/v1/resource-types/"+id, rt, &result)
+	err := c.do(ctx, "PUT", "/v1/resource-types/"+id, rt, &result)
 	return &result, err
 }
 
 func (c *Client) DeleteResourceType(ctx context.Context, id string) error {
-	return c.do(ctx, "DELETE", "/resource-srv/v1/resource-types/"+id, nil, nil)
+	return c.do(ctx, "DELETE", "/v1/resource-types/"+id, nil, nil)
 }
 
 type Resource struct {
@@ -286,24 +286,24 @@ type Resource struct {
 
 func (c *Client) CreateResource(ctx context.Context, res *Resource) (*Resource, error) {
 	var result Resource
-	err := c.do(ctx, "POST", "/resource-srv/v1/resources", res, &result)
+	err := c.do(ctx, "POST", "/v1/resources", res, &result)
 	return &result, err
 }
 
 func (c *Client) GetResource(ctx context.Context, id string) (*Resource, error) {
 	var result Resource
-	err := c.do(ctx, "GET", "/resource-srv/v1/resources/"+id, nil, &result)
+	err := c.do(ctx, "GET", "/v1/resources/"+id, nil, &result)
 	return &result, err
 }
 
 func (c *Client) UpdateResource(ctx context.Context, id string, res *Resource) (*Resource, error) {
 	var result Resource
-	err := c.do(ctx, "PUT", "/resource-srv/v1/resources/"+id, res, &result)
+	err := c.do(ctx, "PUT", "/v1/resources/"+id, res, &result)
 	return &result, err
 }
 
 func (c *Client) DeleteResource(ctx context.Context, id string) error {
-	return c.do(ctx, "DELETE", "/resource-srv/v1/resources/"+id, nil, nil)
+	return c.do(ctx, "DELETE", "/v1/resources/"+id, nil, nil)
 }
 
 type Subject struct {
@@ -319,24 +319,24 @@ type Subject struct {
 
 func (c *Client) CreateSubject(ctx context.Context, s *Subject) (*Subject, error) {
 	var result Subject
-	err := c.do(ctx, "POST", "/entity-srv/v1/entities", s, &result)
+	err := c.do(ctx, "POST", "/v1/entities", s, &result)
 	return &result, err
 }
 
 func (c *Client) GetSubject(ctx context.Context, id string) (*Subject, error) {
 	var result Subject
-	err := c.do(ctx, "GET", "/entity-srv/v1/entities/"+id, nil, &result)
+	err := c.do(ctx, "GET", "/v1/entities/"+id, nil, &result)
 	return &result, err
 }
 
 func (c *Client) UpdateSubject(ctx context.Context, id string, s *Subject) (*Subject, error) {
 	var result Subject
-	err := c.do(ctx, "PUT", "/entity-srv/v1/entities/"+id, s, &result)
+	err := c.do(ctx, "PUT", "/v1/entities/"+id, s, &result)
 	return &result, err
 }
 
 func (c *Client) DeleteSubject(ctx context.Context, id string) error {
-	return c.do(ctx, "DELETE", "/entity-srv/v1/entities/"+id, nil, nil)
+	return c.do(ctx, "DELETE", "/v1/entities/"+id, nil, nil)
 }
 
 type Role struct {
@@ -348,24 +348,24 @@ type Role struct {
 
 func (c *Client) CreateRole(ctx context.Context, r *Role) (*Role, error) {
 	var result Role
-	err := c.do(ctx, "POST", "/policy-srv/v1/roles", r, &result)
+	err := c.do(ctx, "POST", "/v1/roles", r, &result)
 	return &result, err
 }
 
 func (c *Client) GetRole(ctx context.Context, id string) (*Role, error) {
 	var result Role
-	err := c.do(ctx, "GET", "/policy-srv/v1/roles/"+id, nil, &result)
+	err := c.do(ctx, "GET", "/v1/roles/"+id, nil, &result)
 	return &result, err
 }
 
 func (c *Client) UpdateRole(ctx context.Context, id string, r *Role) (*Role, error) {
 	var result Role
-	err := c.do(ctx, "PUT", "/policy-srv/v1/roles/"+id, r, &result)
+	err := c.do(ctx, "PUT", "/v1/roles/"+id, r, &result)
 	return &result, err
 }
 
 func (c *Client) DeleteRole(ctx context.Context, id string) error {
-	return c.do(ctx, "DELETE", "/policy-srv/v1/roles/"+id, nil, nil)
+	return c.do(ctx, "DELETE", "/v1/roles/"+id, nil, nil)
 }
 
 type Group struct {
@@ -376,24 +376,24 @@ type Group struct {
 
 func (c *Client) CreateGroup(ctx context.Context, g *Group) (*Group, error) {
 	var result Group
-	err := c.do(ctx, "POST", "/entity-srv/v1/groups", g, &result)
+	err := c.do(ctx, "POST", "/v1/groups", g, &result)
 	return &result, err
 }
 
 func (c *Client) GetGroup(ctx context.Context, id string) (*Group, error) {
 	var result Group
-	err := c.do(ctx, "GET", "/entity-srv/v1/groups/"+id, nil, &result)
+	err := c.do(ctx, "GET", "/v1/groups/"+id, nil, &result)
 	return &result, err
 }
 
 func (c *Client) UpdateGroup(ctx context.Context, id string, g *Group) (*Group, error) {
 	var result Group
-	err := c.do(ctx, "PUT", "/entity-srv/v1/groups/"+id, g, &result)
+	err := c.do(ctx, "PUT", "/v1/groups/"+id, g, &result)
 	return &result, err
 }
 
 func (c *Client) DeleteGroup(ctx context.Context, id string) error {
-	return c.do(ctx, "DELETE", "/entity-srv/v1/groups/"+id, nil, nil)
+	return c.do(ctx, "DELETE", "/v1/groups/"+id, nil, nil)
 }
 
 type PolicyResourceRef struct {
@@ -431,13 +431,13 @@ type Policy struct {
 
 func (c *Client) CreatePolicy(ctx context.Context, p *Policy) (*Policy, error) {
 	var result Policy
-	err := c.do(ctx, "POST", "/policy-srv/v1/policies", p, &result)
+	err := c.do(ctx, "POST", "/v1/policies", p, &result)
 	return &result, err
 }
 
 func (c *Client) GetPolicy(ctx context.Context, id string) (*Policy, error) {
 	var result Policy
-	if err := c.do(ctx, "GET", "/policy-srv/v1/policies/"+id, nil, &result); err != nil {
+	if err := c.do(ctx, "GET", "/v1/policies/"+id, nil, &result); err != nil {
 		return nil, err
 	}
 
@@ -450,7 +450,7 @@ func (c *Client) GetPolicy(ctx context.Context, id string) (*Policy, error) {
 		Actions    []string `json:"actions"`
 	}
 	var attached []policyResourceResp
-	if err := c.do(ctx, "GET", "/policy-srv/v1/policies/"+id+"/resources", nil, &attached); err == nil {
+	if err := c.do(ctx, "GET", "/v1/policies/"+id+"/resources", nil, &attached); err == nil {
 		refs := make([]PolicyResourceRef, len(attached))
 		for i, a := range attached {
 			refs[i] = PolicyResourceRef{
@@ -467,7 +467,7 @@ func (c *Client) GetPolicy(ctx context.Context, id string) (*Policy, error) {
 		ApplicationID string `json:"application_id"`
 	}
 	var apps []policyAppResp
-	if err := c.do(ctx, "GET", "/policy-srv/v1/policies/"+id+"/applications", nil, &apps); err == nil {
+	if err := c.do(ctx, "GET", "/v1/policies/"+id+"/applications", nil, &apps); err == nil {
 		ids := make([]string, len(apps))
 		for i, a := range apps {
 			ids[i] = a.ApplicationID
@@ -480,12 +480,12 @@ func (c *Client) GetPolicy(ctx context.Context, id string) (*Policy, error) {
 
 func (c *Client) UpdatePolicy(ctx context.Context, id string, p *Policy) (*Policy, error) {
 	var result Policy
-	err := c.do(ctx, "PUT", "/policy-srv/v1/policies/"+id, p, &result)
+	err := c.do(ctx, "PUT", "/v1/policies/"+id, p, &result)
 	return &result, err
 }
 
 func (c *Client) DeletePolicy(ctx context.Context, id string) error {
-	return c.do(ctx, "DELETE", "/policy-srv/v1/policies/"+id, nil, nil)
+	return c.do(ctx, "DELETE", "/v1/policies/"+id, nil, nil)
 }
 
 type PolicyAssignment struct {
@@ -495,21 +495,21 @@ type PolicyAssignment struct {
 }
 
 func (c *Client) AssignPolicy(ctx context.Context, a *PolicyAssignment) error {
-	return c.do(ctx, "PUT", "/policy-srv/v1/policies/assign", a, nil)
+	return c.do(ctx, "PUT", "/v1/policies/assign", a, nil)
 }
 
 func (c *Client) UnassignPolicy(ctx context.Context, entityType, entityID, policyID string) error {
-	path := fmt.Sprintf("/policy-srv/v1/policies/unassign/%s/%s/%s", entityType, entityID, policyID)
+	path := fmt.Sprintf("/v1/policies/unassign/%s/%s/%s", entityType, entityID, policyID)
 	return c.do(ctx, "DELETE", path, nil, nil)
 }
 
 func (c *Client) AssignRoleToSubject(ctx context.Context, subjectID, roleID string) error {
 	body := map[string]string{"role_id": roleID}
-	path := fmt.Sprintf("/entity-srv/v1/entities/%s/roles", subjectID)
+	path := fmt.Sprintf("/v1/entities/%s/roles", subjectID)
 	return c.do(ctx, "POST", path, body, nil)
 }
 
 func (c *Client) UnassignRoleFromSubject(ctx context.Context, subjectID, roleID string) error {
-	path := fmt.Sprintf("/entity-srv/v1/entities/%s/roles/%s", subjectID, roleID)
+	path := fmt.Sprintf("/v1/entities/%s/roles/%s", subjectID, roleID)
 	return c.do(ctx, "DELETE", path, nil, nil)
 }

@@ -33,7 +33,7 @@ func (p *authzxProvider) Metadata(_ context.Context, _ provider.MetadataRequest,
 
 func (p *authzxProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage AuthzX authorization resources — applications, subjects, resources, roles, and policies. " +
+		Description: "Manage AuthzX authorization resources — namespaces, subjects, resources, roles, and policies. " +
 			"Authenticates via OAuth2 Client Credentials (RFC 6749 §4.4).",
 		Attributes: map[string]schema.Attribute{
 			"client_id": schema.StringAttribute{
@@ -119,7 +119,7 @@ func (p *authzxProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 func (p *authzxProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewApplicationResource,
+		NewNamespaceResource,
 		NewResourceTypeResource,
 		NewResourceResource,
 		NewSubjectResource,

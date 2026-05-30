@@ -21,7 +21,7 @@ type resourceModel struct {
 	Name          types.String `tfsdk:"name"`
 	Description   types.String `tfsdk:"description"`
 	Type          types.String `tfsdk:"type"`
-	ApplicationID types.String `tfsdk:"application_id"`
+	NamespaceID types.String `tfsdk:"namespace_id"`
 	ExternalID    types.String `tfsdk:"external_id"`
 }
 
@@ -56,9 +56,9 @@ func (r *resourceResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Required:    true,
 				Description: "Resource type ID.",
 			},
-			"application_id": schema.StringAttribute{
+			"namespace_id": schema.StringAttribute{
 				Required:    true,
-				Description: "Application this resource belongs to.",
+				Description: "Namespace this resource belongs to.",
 			},
 			"external_id": schema.StringAttribute{
 				Optional:    true,
@@ -85,7 +85,7 @@ func (r *resourceResource) Create(ctx context.Context, req resource.CreateReques
 		Name:          plan.Name.ValueString(),
 		Description:   plan.Description.ValueString(),
 		Type:          plan.Type.ValueString(),
-		ApplicationID: plan.ApplicationID.ValueString(),
+		ApplicationID: plan.NamespaceID.ValueString(),
 		ExternalID:    plan.ExternalID.ValueString(),
 	})
 	if err != nil {
@@ -113,7 +113,7 @@ func (r *resourceResource) Read(ctx context.Context, req resource.ReadRequest, r
 	state.Name = types.StringValue(res.Name)
 	state.Description = stringOrNull(res.Description)
 	state.Type = types.StringValue(res.Type)
-	state.ApplicationID = types.StringValue(res.ApplicationID)
+	state.NamespaceID = types.StringValue(res.ApplicationID)
 	state.ExternalID = stringOrNull(res.ExternalID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -131,7 +131,7 @@ func (r *resourceResource) Update(ctx context.Context, req resource.UpdateReques
 		Name:          plan.Name.ValueString(),
 		Description:   plan.Description.ValueString(),
 		Type:          plan.Type.ValueString(),
-		ApplicationID: plan.ApplicationID.ValueString(),
+		ApplicationID: plan.NamespaceID.ValueString(),
 		ExternalID:    plan.ExternalID.ValueString(),
 	})
 	if err != nil {
@@ -167,7 +167,7 @@ func (r *resourceResource) ImportState(ctx context.Context, req resource.ImportS
 		Name:          types.StringValue(res.Name),
 		Description:   stringOrNull(res.Description),
 		Type:          types.StringValue(res.Type),
-		ApplicationID: types.StringValue(res.ApplicationID),
+		NamespaceID:   types.StringValue(res.ApplicationID),
 		ExternalID:    stringOrNull(res.ExternalID),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
