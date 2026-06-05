@@ -1,17 +1,17 @@
 ---
-page_title: "authzx_role Resource"
-description: "Manages an AuthzX role."
+page_title: "vengtoo_role Resource"
+description: "Manages an Vengtoo role."
 ---
 
-# authzx_role
+# vengtoo_role
 
 A role groups permissions together. Assign policies to roles, then assign roles to subjects.
 
 ## Example Usage
 
 ```terraform
-resource "authzx_role" "editor" {
-  application_id = authzx_application.example.id
+resource "vengtoo_role" "editor" {
+  application_id = vengtoo_application.example.id
   name           = "editor"
   description    = "Can read and write documents"
 }
@@ -38,5 +38,5 @@ resource "authzx_role" "editor" {
 Roles can be imported using their ID:
 
 ```shell
-terraform import authzx_role.editor <role-id>
+terraform import vengtoo_role.editor <role-id>
 ```

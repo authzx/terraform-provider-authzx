@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/authzx/terraform-provider-authzx/internal/client"
+	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -35,7 +35,7 @@ func (r *resourceResource) Metadata(_ context.Context, req resource.MetadataRequ
 
 func (r *resourceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages an AuthzX resource — a specific instance of a resource type.",
+		Description: "Manages an Vengtoo resource — a specific instance of a resource type.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:    true,

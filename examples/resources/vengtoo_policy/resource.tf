@@ -1,5 +1,5 @@
-resource "authzx_policy" "editors_can_edit" {
-  application_id = authzx_application.example.id
+resource "vengtoo_policy" "editors_can_edit" {
+  application_id = vengtoo_application.example.id
   name           = "editors-can-edit"
   description    = "Editors can read and write documents"
   effect         = "ALLOW"

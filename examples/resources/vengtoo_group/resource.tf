@@ -1,4 +1,4 @@
-resource "authzx_group" "engineering" {
+resource "vengtoo_group" "engineering" {
   name        = "engineering"
   description = "Engineering team members"
 }

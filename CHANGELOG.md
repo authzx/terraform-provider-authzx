@@ -4,39 +4,39 @@
 
 ### Breaking changes
 
-- Authentication switched from API keys to OAuth 2.0 Client Credentials. Update your provider block to use `client_id` / `client_secret` instead of `api_key`. Create an OAuth client at **Settings → API → OAuth Clients** in the AuthzX console.
+- Authentication switched from API keys to OAuth 2.0 Client Credentials. Update your provider block to use `client_id` / `client_secret` instead of `api_key`. Create an OAuth client at **Settings → API → OAuth Clients** in the Vengtoo console.
 
 ### Added
 
-- `client_id` (String) provider attribute, or `AUTHZX_CLIENT_ID` env var.
-- `client_secret` (String, Sensitive) provider attribute, or `AUTHZX_CLIENT_SECRET` env var.
-- `endpoint` (String) provider attribute, or `AUTHZX_ENDPOINT` env var. Defaults to `https://api.authzx.com`.
+- `client_id` (String) provider attribute, or `VENGTOO_CLIENT_ID` env var.
+- `client_secret` (String, Sensitive) provider attribute, or `VENGTOO_CLIENT_SECRET` env var.
+- `endpoint` (String) provider attribute, or `VENGTOO_ENDPOINT` env var. Defaults to `https://api.vengtoo.com`.
 - Automatic token refresh before expiry and on 401 responses.
 
 ### Removed
 
-- `api_key` provider attribute and `AUTHZX_API_KEY` env var.
+- `api_key` provider attribute and `VENGTOO_API_KEY` env var.
 - `base_url` provider attribute (renamed to `endpoint`).
 
 ## v0.1.0 — 2026-04-16
 
-Initial public release of the AuthzX Terraform provider.
+Initial public release of the Vengtoo Terraform provider.
 
 ### Resources
 
-- `authzx_application`
-- `authzx_resource_type`
-- `authzx_resource`
-- `authzx_subject`
-- `authzx_role`
-- `authzx_group`
-- `authzx_policy`
-- `authzx_policy_assignment`
-- `authzx_role_assignment`
+- `vengtoo_application`
+- `vengtoo_resource_type`
+- `vengtoo_resource`
+- `vengtoo_subject`
+- `vengtoo_role`
+- `vengtoo_group`
+- `vengtoo_policy`
+- `vengtoo_policy_assignment`
+- `vengtoo_role_assignment`
 
 All resources support Create, Read, Update, Delete, and Import.
 
 ### Authentication
 
-- API key via provider `api_key` attribute or `AUTHZX_API_KEY` environment variable.
-- Optional `base_url` for self-hosted AuthzX deployments.
+- API key via provider `api_key` attribute or `VENGTOO_API_KEY` environment variable.
+- Optional `base_url` for self-hosted Vengtoo deployments.

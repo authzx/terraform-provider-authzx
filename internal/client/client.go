@@ -22,7 +22,7 @@ var ErrAuthentication = errors.New("authentication failed: check client_id/clien
 // tokenRefreshLeeway is how close to expiry we refresh proactively.
 const tokenRefreshLeeway = 60 * time.Second
 
-// Client is an authenticated HTTP client for the AuthzX API. It acquires an
+// Client is an authenticated HTTP client for the Vengtoo API. It acquires an
 // access token via the OAuth2 Client Credentials flow (RFC 6749 §4.4) and
 // transparently refreshes it on expiry or on a 401 response.
 type Client struct {

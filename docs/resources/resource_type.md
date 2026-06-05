@@ -1,17 +1,17 @@
 ---
-page_title: "authzx_resource_type Resource"
-description: "Manages an AuthzX resource type."
+page_title: "vengtoo_resource_type Resource"
+description: "Manages an Vengtoo resource type."
 ---
 
-# authzx_resource_type
+# vengtoo_resource_type
 
 A resource type defines a category of things you want to protect, along with the actions available on them.
 
 ## Example Usage
 
 ```terraform
-resource "authzx_resource_type" "document" {
-  application_id = authzx_application.example.id
+resource "vengtoo_resource_type" "document" {
+  application_id = vengtoo_application.example.id
   name           = "document"
   description    = "Documents and files"
   actions        = ["read", "write", "delete", "share"]
@@ -40,5 +40,5 @@ resource "authzx_resource_type" "document" {
 Resource types can be imported using their ID:
 
 ```shell
-terraform import authzx_resource_type.document <resource-type-id>
+terraform import vengtoo_resource_type.document <resource-type-id>
 ```

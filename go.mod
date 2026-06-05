@@ -1,4 +1,4 @@
-module github.com/authzx/terraform-provider-authzx
+module github.com/vengtoo/terraform-provider-vengtoo
 
 go 1.24.0
 

@@ -1,16 +1,16 @@
 ---
-page_title: "authzx_namespace Resource"
-description: "Manages an AuthzX namespace."
+page_title: "vengtoo_namespace Resource"
+description: "Manages an Vengtoo namespace."
 ---
 
-# authzx_namespace
+# vengtoo_namespace
 
 A namespace is a top-level container for your authorization model. All resource types, subjects, roles, and policies belong to a namespace.
 
 ## Example Usage
 
 ```terraform
-resource "authzx_namespace" "example" {
+resource "vengtoo_namespace" "example" {
   name        = "My Namespace"
   description = "Namespace for managing document access"
 }
@@ -36,5 +36,5 @@ resource "authzx_namespace" "example" {
 Namespaces can be imported using their ID:
 
 ```shell
-terraform import authzx_namespace.example <namespace-id>
+terraform import vengtoo_namespace.example <namespace-id>
 ```

@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/authzx/terraform-provider-authzx/internal/client"
+	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"

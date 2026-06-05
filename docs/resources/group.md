@@ -1,16 +1,16 @@
 ---
-page_title: "authzx_group Resource"
-description: "Manages an AuthzX group."
+page_title: "vengtoo_group Resource"
+description: "Manages an Vengtoo group."
 ---
 
-# authzx_group
+# vengtoo_group
 
 A group bundles subjects together so roles and policies can be assigned to many subjects at once.
 
 ## Example Usage
 
 ```terraform
-resource "authzx_group" "engineering" {
+resource "vengtoo_group" "engineering" {
   name        = "engineering"
   description = "Engineering team members"
 }
@@ -36,5 +36,5 @@ resource "authzx_group" "engineering" {
 Groups can be imported using their ID:
 
 ```shell
-terraform import authzx_group.engineering <group-id>
+terraform import vengtoo_group.engineering <group-id>
 ```

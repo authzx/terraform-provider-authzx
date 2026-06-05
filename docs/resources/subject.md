@@ -1,17 +1,17 @@
 ---
-page_title: "authzx_subject Resource"
-description: "Manages an AuthzX subject."
+page_title: "vengtoo_subject Resource"
+description: "Manages an Vengtoo subject."
 ---
 
-# authzx_subject
+# vengtoo_subject
 
 A subject is an actor in your system — a user, service, or device that performs actions on resources.
 
 ## Example Usage
 
 ```terraform
-resource "authzx_subject" "alice" {
-  application_id = authzx_application.example.id
+resource "vengtoo_subject" "alice" {
+  application_id = vengtoo_application.example.id
   name           = "Alice"
   type           = "user"
 }
@@ -39,5 +39,5 @@ resource "authzx_subject" "alice" {
 Subjects can be imported using their ID:
 
 ```shell
-terraform import authzx_subject.alice <subject-id>
+terraform import vengtoo_subject.alice <subject-id>
 ```

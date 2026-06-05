@@ -1,17 +1,17 @@
 ---
-page_title: "authzx_policy Resource"
-description: "Manages an AuthzX policy."
+page_title: "vengtoo_policy Resource"
+description: "Manages an Vengtoo policy."
 ---
 
-# authzx_policy
+# vengtoo_policy
 
 A policy defines an authorization rule — which actions are allowed or denied on which resource types.
 
 ## Example Usage
 
 ```terraform
-resource "authzx_policy" "editors_can_edit" {
-  application_id = authzx_application.example.id
+resource "vengtoo_policy" "editors_can_edit" {
+  application_id = vengtoo_application.example.id
   name           = "editors-can-edit"
   description    = "Editors can read and write documents"
   effect         = "ALLOW"
@@ -70,5 +70,5 @@ Required:
 Policies can be imported using their ID:
 
 ```shell
-terraform import authzx_policy.editors_can_edit <policy-id>
+terraform import vengtoo_policy.editors_can_edit <policy-id>
 ```
