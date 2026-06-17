@@ -21,7 +21,6 @@ type resourceTypeModel struct {
 	Name          types.String `tfsdk:"name"`
 	Description   types.String `tfsdk:"description"`
 	Actions       types.List   `tfsdk:"actions"`
-	NamespaceID types.String `tfsdk:"namespace_id"`
 }
 
 func NewResourceTypeResource() resource.Resource {
@@ -56,10 +55,6 @@ func (r *resourceTypeResource) Schema(_ context.Context, _ resource.SchemaReques
 				ElementType: types.StringType,
 				Description: "Available actions (e.g., read, write, delete).",
 			},
-			"namespace_id": schema.StringAttribute{
-				Required:    true,
-				Description: "Namespace this resource type belongs to.",
-			},
 		},
 	}
 }
@@ -89,7 +84,6 @@ func (r *resourceTypeResource) Create(ctx context.Context, req resource.CreateRe
 		Name:           plan.Name.ValueString(),
 		Description:    plan.Description.ValueString(),
 		DefaultActions: defaultActions,
-		ApplicationID:  plan.NamespaceID.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create resource type", err.Error())
@@ -148,7 +142,6 @@ func (r *resourceTypeResource) Update(ctx context.Context, req resource.UpdateRe
 		Name:           plan.Name.ValueString(),
 		Description:    plan.Description.ValueString(),
 		DefaultActions: defaultActions,
-		ApplicationID:  plan.NamespaceID.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update resource type", err.Error())
@@ -190,7 +183,6 @@ func (r *resourceTypeResource) ImportState(ctx context.Context, req resource.Imp
 		Name:          types.StringValue(rt.Name),
 		Description:   stringOrNull(rt.Description),
 		Actions:       actionsList,
-		NamespaceID:   types.StringValue(rt.ApplicationID),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

@@ -401,6 +401,11 @@ type PolicyResourceRef struct {
 	Actions    []string `json:"actions"`
 }
 
+type PolicyResourceTypeRef struct {
+	ResourceTypeID string   `json:"resource_type_id"`
+	Actions        []string `json:"actions"`
+}
+
 // PolicyCondition is one structured entry inside a policy's conditions array.
 // The backend stores conditions as a JSONB blob; this shape matches what the
 // Rego evaluator (resources/authz.rego) reads:
@@ -418,15 +423,16 @@ type PolicyCondition struct {
 }
 
 type Policy struct {
-	ID             string              `json:"id"`
-	Name           string              `json:"name"`
-	Description    string              `json:"description,omitempty"`
-	Effect         string              `json:"effect"`
-	Resources      []PolicyResourceRef `json:"resources"`
-	Priority       int                 `json:"priority,omitempty"`
-	Actions        []string            `json:"actions,omitempty"`
-	ApplicationIDs []string            `json:"application_ids,omitempty"`
-	Conditions     []PolicyCondition   `json:"conditions,omitempty"`
+	ID             string                  `json:"id"`
+	Name           string                  `json:"name"`
+	Description    string                  `json:"description,omitempty"`
+	Effect         string                  `json:"effect"`
+	Resources      []PolicyResourceRef     `json:"resources"`
+	ResourceTypes  []PolicyResourceTypeRef `json:"resource_types,omitempty"`
+	Priority       int                     `json:"priority,omitempty"`
+	Actions        []string                `json:"actions,omitempty"`
+	ApplicationIDs []string                `json:"application_ids,omitempty"`
+	Conditions     []PolicyCondition       `json:"conditions,omitempty"`
 }
 
 func (c *Client) CreatePolicy(ctx context.Context, p *Policy) (*Policy, error) {
@@ -473,6 +479,23 @@ func (c *Client) GetPolicy(ctx context.Context, id string) (*Policy, error) {
 			ids[i] = a.ApplicationID
 		}
 		result.ApplicationIDs = ids
+	}
+
+	// Resource-type targets live in a separate join table.
+	type policyResourceTypeResp struct {
+		ResourceTypeID string   `json:"resource_type_id"`
+		Actions        []string `json:"actions"`
+	}
+	var rtAttached []policyResourceTypeResp
+	if err := c.do(ctx, "GET", "/v1/policies/"+id+"/resource-types", nil, &rtAttached); err == nil {
+		refs := make([]PolicyResourceTypeRef, len(rtAttached))
+		for i, rt := range rtAttached {
+			refs[i] = PolicyResourceTypeRef{
+				ResourceTypeID: rt.ResourceTypeID,
+				Actions:        rt.Actions,
+			}
+		}
+		result.ResourceTypes = refs
 	}
 
 	return &result, nil

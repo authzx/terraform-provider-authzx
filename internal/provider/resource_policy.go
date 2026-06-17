@@ -21,21 +21,25 @@ type policyResource struct {
 }
 
 type policyModel struct {
-	ID             types.String `tfsdk:"id"`
-	Name           types.String `tfsdk:"name"`
-	Description    types.String `tfsdk:"description"`
-	Effect         types.String `tfsdk:"effect"`
-	Resources      types.List   `tfsdk:"resources"`
-	Priority       types.Int64  `tfsdk:"priority"`
-	NamespaceID  types.String `tfsdk:"namespace_id"`
-	Actions      types.List   `tfsdk:"actions"`
-	NamespaceIDs types.List   `tfsdk:"namespace_ids"`
-	Conditions     types.List   `tfsdk:"conditions"`
+	ID            types.String `tfsdk:"id"`
+	Name          types.String `tfsdk:"name"`
+	Description   types.String `tfsdk:"description"`
+	Effect        types.String `tfsdk:"effect"`
+	Resources     types.List   `tfsdk:"resources"`
+	ResourceTypes types.List   `tfsdk:"resource_types"`
+	Priority      types.Int64  `tfsdk:"priority"`
+	Actions       types.List   `tfsdk:"actions"`
+	Conditions    types.List   `tfsdk:"conditions"`
 }
 
 type policyResourceRefModel struct {
 	ResourceID types.String `tfsdk:"resource_id"`
 	Actions    types.List   `tfsdk:"actions"`
+}
+
+type policyResourceTypeRefModel struct {
+	ResourceTypeID types.String `tfsdk:"resource_type_id"`
+	Actions        types.List   `tfsdk:"actions"`
 }
 
 // policyConditionModel mirrors client.PolicyCondition. Value is surfaced as a
@@ -85,11 +89,6 @@ func (r *policyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				ElementType: types.StringType,
 				Description: "Policy-level actions (e.g., read, write, delete). Used for app-wide policies.",
 			},
-			"namespace_ids": schema.ListAttribute{
-				Optional:    true,
-				ElementType: types.StringType,
-				Description: "Namespace IDs this policy protects. All resources in these namespaces are covered.",
-			},
 			"resources": schema.ListNestedAttribute{
 				Optional:    true,
 				Description: "Resources and actions this policy applies to.",
@@ -107,6 +106,23 @@ func (r *policyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 					},
 				},
 			},
+			"resource_types": schema.ListNestedAttribute{
+				Optional:    true,
+				Description: "Resource types and actions this policy applies to (type-level targeting — covers all resources of the type).",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"resource_type_id": schema.StringAttribute{
+							Required:    true,
+							Description: "Resource type ID.",
+						},
+						"actions": schema.ListAttribute{
+							Required:    true,
+							ElementType: types.StringType,
+							Description: "Actions allowed/denied on this resource type.",
+						},
+					},
+				},
+			},
 			"priority": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
@@ -114,10 +130,6 @@ func (r *policyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
-			},
-			"namespace_id": schema.StringAttribute{
-				Required:    true,
-				Description: "Namespace this policy belongs to.",
 			},
 			"conditions": schema.ListNestedAttribute{
 				Optional:    true,
@@ -241,6 +253,52 @@ func toClientResources(ctx context.Context, l types.List) ([]client.PolicyResour
 	return result, nil
 }
 
+func toClientResourceTypes(ctx context.Context, l types.List) ([]client.PolicyResourceTypeRef, error) {
+	if l.IsNull() || l.IsUnknown() {
+		return nil, nil
+	}
+	var refs []policyResourceTypeRefModel
+	diags := l.ElementsAs(ctx, &refs, false)
+	if diags.HasError() {
+		return nil, fmt.Errorf("failed to parse resource_types: %s", diags.Errors())
+	}
+	result := make([]client.PolicyResourceTypeRef, len(refs))
+	for i, ref := range refs {
+		var actions []string
+		diags := ref.Actions.ElementsAs(ctx, &actions, false)
+		if diags.HasError() {
+			return nil, fmt.Errorf("failed to parse resource_types[%d].actions: %s", i, diags.Errors())
+		}
+		result[i] = client.PolicyResourceTypeRef{
+			ResourceTypeID: ref.ResourceTypeID.ValueString(),
+			Actions:        actions,
+		}
+	}
+	return result, nil
+}
+
+func resourceTypesToList(ctx context.Context, rts []client.PolicyResourceTypeRef) (types.List, diag.Diagnostics) {
+	elemType := types.ObjectType{
+		AttrTypes: map[string]attr.Type{
+			"resource_type_id": types.StringType,
+			"actions":          types.ListType{ElemType: types.StringType},
+		},
+	}
+	if len(rts) == 0 {
+		return types.ListNull(elemType), nil
+	}
+	elems := make([]attr.Value, len(rts))
+	for i, rt := range rts {
+		actionsList, _ := types.ListValueFrom(ctx, types.StringType, rt.Actions)
+		obj, _ := types.ObjectValue(elemType.AttrTypes, map[string]attr.Value{
+			"resource_type_id": types.StringValue(rt.ResourceTypeID),
+			"actions":          actionsList,
+		})
+		elems[i] = obj
+	}
+	return types.ListValue(elemType, elems)
+}
+
 func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan policyModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -258,15 +316,17 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 		}
 	}
 
+	resourceTypes, err := toClientResourceTypes(ctx, plan.ResourceTypes)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to parse resource_types", err.Error())
+		return
+	}
+
 	var actions []string
 	if !plan.Actions.IsNull() {
 		resp.Diagnostics.Append(plan.Actions.ElementsAs(ctx, &actions, false)...)
 	}
 
-	appIDs := []string{plan.NamespaceID.ValueString()}
-	if !plan.NamespaceIDs.IsNull() {
-		resp.Diagnostics.Append(plan.NamespaceIDs.ElementsAs(ctx, &appIDs, false)...)
-	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -278,14 +338,14 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	policy, err := r.client.CreatePolicy(ctx, &client.Policy{
-		Name:           plan.Name.ValueString(),
-		Description:    plan.Description.ValueString(),
-		Effect:         plan.Effect.ValueString(),
-		Resources:      resources,
-		Priority:       int(plan.Priority.ValueInt64()),
-		Actions:        actions,
-		ApplicationIDs: appIDs,
-		Conditions:     conditions,
+		Name:          plan.Name.ValueString(),
+		Description:   plan.Description.ValueString(),
+		Effect:        plan.Effect.ValueString(),
+		Resources:     resources,
+		ResourceTypes: resourceTypes,
+		Priority:      int(plan.Priority.ValueInt64()),
+		Actions:       actions,
+		Conditions:    conditions,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create policy", err.Error())
@@ -294,6 +354,11 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	plan.ID = types.StringValue(policy.ID)
 	plan.Priority = types.Int64Value(int64(policy.Priority))
+
+	rtList, diags := resourceTypesToList(ctx, policy.ResourceTypes)
+	resp.Diagnostics.Append(diags...)
+	plan.ResourceTypes = rtList
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -320,6 +385,11 @@ func (r *policyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	resp.Diagnostics.Append(diags...)
 	state.Resources = resourcesList
 
+	// Resource type targets
+	rtList, diags := resourceTypesToList(ctx, policy.ResourceTypes)
+	resp.Diagnostics.Append(diags...)
+	state.ResourceTypes = rtList
+
 	// Actions
 	if len(policy.Actions) > 0 {
 		actionsList, diags := types.ListValueFrom(ctx, types.StringType, policy.Actions)
@@ -327,15 +397,6 @@ func (r *policyResource) Read(ctx context.Context, req resource.ReadRequest, res
 		state.Actions = actionsList
 	} else {
 		state.Actions = types.ListNull(types.StringType)
-	}
-
-	// Namespace IDs (protected namespaces)
-	if len(policy.ApplicationIDs) > 0 {
-		appIDsList, diags := types.ListValueFrom(ctx, types.StringType, policy.ApplicationIDs)
-		resp.Diagnostics.Append(diags...)
-		state.NamespaceIDs = appIDsList
-	} else {
-		state.NamespaceIDs = types.ListNull(types.StringType)
 	}
 
 	// Conditions — polymorphic value, stored as value_json per element.
@@ -365,15 +426,17 @@ func (r *policyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 	}
 
+	resourceTypes, err := toClientResourceTypes(ctx, plan.ResourceTypes)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to parse resource_types", err.Error())
+		return
+	}
+
 	var actions []string
 	if !plan.Actions.IsNull() {
 		resp.Diagnostics.Append(plan.Actions.ElementsAs(ctx, &actions, false)...)
 	}
 
-	appIDs := []string{plan.NamespaceID.ValueString()}
-	if !plan.NamespaceIDs.IsNull() {
-		resp.Diagnostics.Append(plan.NamespaceIDs.ElementsAs(ctx, &appIDs, false)...)
-	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -385,14 +448,14 @@ func (r *policyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	_, err = r.client.UpdatePolicy(ctx, state.ID.ValueString(), &client.Policy{
-		Name:           plan.Name.ValueString(),
-		Description:    plan.Description.ValueString(),
-		Effect:         plan.Effect.ValueString(),
-		Resources:      resources,
-		Priority:       int(plan.Priority.ValueInt64()),
-		Actions:        actions,
-		ApplicationIDs: appIDs,
-		Conditions:     conditions,
+		Name:          plan.Name.ValueString(),
+		Description:   plan.Description.ValueString(),
+		Effect:        plan.Effect.ValueString(),
+		Resources:     resources,
+		ResourceTypes: resourceTypes,
+		Priority:      int(plan.Priority.ValueInt64()),
+		Actions:       actions,
+		Conditions:    conditions,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update policy", err.Error())
@@ -434,15 +497,6 @@ func (r *policyResource) ImportState(ctx context.Context, req resource.ImportSta
 		actionsList = types.ListNull(types.StringType)
 	}
 
-	var nsIDsList types.List
-	if len(policy.ApplicationIDs) > 0 {
-		al, d := types.ListValueFrom(ctx, types.StringType, policy.ApplicationIDs)
-		resp.Diagnostics.Append(d...)
-		nsIDsList = al
-	} else {
-		nsIDsList = types.ListNull(types.StringType)
-	}
-
 	state := policyModel{
 		ID:           types.StringValue(policy.ID),
 		Name:         types.StringValue(policy.Name),
@@ -450,9 +504,7 @@ func (r *policyResource) ImportState(ctx context.Context, req resource.ImportSta
 		Effect:       types.StringValue(policy.Effect),
 		Resources:    resourcesList,
 		Priority:     types.Int64Value(int64(policy.Priority)),
-		NamespaceID:  types.StringValue(firstOrEmpty(policy.ApplicationIDs)),
 		Actions:      actionsList,
-		NamespaceIDs: nsIDsList,
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

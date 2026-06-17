@@ -57,8 +57,12 @@ func (r *resourceResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Description: "Resource type ID.",
 			},
 			"namespace_id": schema.StringAttribute{
-				Required:    true,
-				Description: "Namespace this resource belongs to.",
+				Optional:    true,
+				Computed:    true,
+				Description: "Namespace this resource belongs to. Omit to use the tenant's default namespace.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"external_id": schema.StringAttribute{
 				Optional:    true,
@@ -94,6 +98,9 @@ func (r *resourceResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	plan.ID = types.StringValue(res.ID)
+	// Reflect the server-assigned namespace (the tenant default when omitted)
+	// so the Computed value is known and doesn't drift on the next plan.
+	plan.NamespaceID = types.StringValue(res.ApplicationID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 

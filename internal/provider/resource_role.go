@@ -20,7 +20,6 @@ type roleModel struct {
 	ID            types.String `tfsdk:"id"`
 	Name          types.String `tfsdk:"name"`
 	Description   types.String `tfsdk:"description"`
-	NamespaceID types.String `tfsdk:"namespace_id"`
 }
 
 func NewRoleResource() resource.Resource {
@@ -50,10 +49,6 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Optional:    true,
 				Description: "Role description.",
 			},
-			"namespace_id": schema.StringAttribute{
-				Required:    true,
-				Description: "Namespace this role belongs to.",
-			},
 		},
 	}
 }
@@ -74,7 +69,6 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 	role, err := r.client.CreateRole(ctx, &client.Role{
 		Name:           plan.Name.ValueString(),
 		Description:    plan.Description.ValueString(),
-		ApplicationIDs: []string{plan.NamespaceID.ValueString()},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create role", err.Error())
@@ -115,7 +109,6 @@ func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	_, err := r.client.UpdateRole(ctx, state.ID.ValueString(), &client.Role{
 		Name:           plan.Name.ValueString(),
 		Description:    plan.Description.ValueString(),
-		ApplicationIDs: []string{plan.NamespaceID.ValueString()},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update role", err.Error())
@@ -149,7 +142,6 @@ func (r *roleResource) ImportState(ctx context.Context, req resource.ImportState
 		ID:            types.StringValue(role.ID),
 		Name:          types.StringValue(role.Name),
 		Description:   stringOrNull(role.Description),
-		NamespaceID: types.StringValue(firstOrEmpty(role.ApplicationIDs)),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

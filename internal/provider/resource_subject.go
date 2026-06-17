@@ -20,7 +20,6 @@ type subjectModel struct {
 	ID            types.String `tfsdk:"id"`
 	Name          types.String `tfsdk:"name"`
 	Type          types.String `tfsdk:"type"`
-	NamespaceID types.String `tfsdk:"namespace_id"`
 	ExternalID  types.String `tfsdk:"external_id"`
 }
 
@@ -51,10 +50,6 @@ func (r *subjectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Required:    true,
 				Description: "Subject type (e.g., user, service, device).",
 			},
-			"namespace_id": schema.StringAttribute{
-				Required:    true,
-				Description: "Namespace this subject belongs to.",
-			},
 			"external_id": schema.StringAttribute{
 				Optional:    true,
 				Description: "Your system's reference ID for this subject. Usable in /v1/authorize as an alternative to the subject's UUID.",
@@ -67,13 +62,6 @@ func (r *subjectResource) Configure(_ context.Context, req resource.ConfigureReq
 	if req.ProviderData != nil {
 		r.client = req.ProviderData.(*client.Client)
 	}
-}
-
-func firstOrEmpty(s []string) string {
-	if len(s) > 0 {
-		return s[0]
-	}
-	return ""
 }
 
 // stringOrNull converts a backend string to a types.String, treating "" as null.
@@ -96,7 +84,6 @@ func (r *subjectResource) Create(ctx context.Context, req resource.CreateRequest
 	s, err := r.client.CreateSubject(ctx, &client.Subject{
 		Name:           plan.Name.ValueString(),
 		Type:           plan.Type.ValueString(),
-		ApplicationIDs: []string{plan.NamespaceID.ValueString()},
 		ExternalID:     plan.ExternalID.ValueString(),
 	})
 	if err != nil {
@@ -139,7 +126,6 @@ func (r *subjectResource) Update(ctx context.Context, req resource.UpdateRequest
 	_, err := r.client.UpdateSubject(ctx, state.ID.ValueString(), &client.Subject{
 		Name:           plan.Name.ValueString(),
 		Type:           plan.Type.ValueString(),
-		ApplicationIDs: []string{plan.NamespaceID.ValueString()},
 		ExternalID:     plan.ExternalID.ValueString(),
 	})
 	if err != nil {
@@ -174,7 +160,6 @@ func (r *subjectResource) ImportState(ctx context.Context, req resource.ImportSt
 		ID:            types.StringValue(s.ID),
 		Name:          types.StringValue(s.Name),
 		Type:          types.StringValue(s.Type),
-		NamespaceID: types.StringValue(firstOrEmpty(s.ApplicationIDs)),
 		ExternalID:  stringOrNull(s.ExternalID),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
