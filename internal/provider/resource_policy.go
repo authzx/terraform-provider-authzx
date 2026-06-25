@@ -488,6 +488,12 @@ func (r *policyResource) ImportState(ctx context.Context, req resource.ImportSta
 	resourcesList, diags := resourcesToList(ctx, policy.Resources)
 	resp.Diagnostics.Append(diags...)
 
+	rtList, diags := resourceTypesToList(ctx, policy.ResourceTypes)
+	resp.Diagnostics.Append(diags...)
+
+	conditionsList, diags := conditionsToList(ctx, policy.Conditions)
+	resp.Diagnostics.Append(diags...)
+
 	var actionsList types.List
 	if len(policy.Actions) > 0 {
 		al, d := types.ListValueFrom(ctx, types.StringType, policy.Actions)
@@ -498,13 +504,15 @@ func (r *policyResource) ImportState(ctx context.Context, req resource.ImportSta
 	}
 
 	state := policyModel{
-		ID:           types.StringValue(policy.ID),
-		Name:         types.StringValue(policy.Name),
-		Description:  types.StringValue(policy.Description),
-		Effect:       types.StringValue(policy.Effect),
-		Resources:    resourcesList,
-		Priority:     types.Int64Value(int64(policy.Priority)),
-		Actions:      actionsList,
+		ID:            types.StringValue(policy.ID),
+		Name:          types.StringValue(policy.Name),
+		Description:   types.StringValue(policy.Description),
+		Effect:        types.StringValue(policy.Effect),
+		Resources:     resourcesList,
+		ResourceTypes: rtList,
+		Priority:      types.Int64Value(int64(policy.Priority)),
+		Actions:       actionsList,
+		Conditions:    conditionsList,
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

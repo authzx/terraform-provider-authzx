@@ -1,6 +1,6 @@
 # Vengtoo Terraform Provider
 
-Terraform provider for [Vengtoo](https://vengtoo.com) — manage applications, resources, subjects, roles, groups and policies as infrastructure as code.
+Terraform provider for [Vengtoo](https://vengtoo.com) — manage applications, resources, subjects, roles, and policies as infrastructure as code.
 
 Requires Terraform 1.0+.
 
@@ -11,7 +11,7 @@ terraform {
   required_providers {
     vengtoo = {
       source  = "vengtoo/vengtoo"
-      version = "~> 0.2"
+      version = "~> 1.2"
     }
   }
 }
@@ -79,7 +79,6 @@ resource "vengtoo_resource" "wiki" {
 }
 
 resource "vengtoo_policy" "editors_can_edit" {
-  application_id = vengtoo_application.app.id
   name           = "editors-can-edit"
   description    = "Editors can read and write the wiki"
   effect         = "ALLOW"
@@ -114,10 +113,9 @@ See [`examples/`](./examples) for per-resource snippets.
 | [`vengtoo_resource_type`](https://registry.terraform.io/providers/vengtoo/vengtoo/latest/docs/resources/resource_type) | Resource type with a set of available actions. |
 | [`vengtoo_resource`](https://registry.terraform.io/providers/vengtoo/vengtoo/latest/docs/resources/resource) | Instance of a resource type that policies reference. |
 | [`vengtoo_subject`](https://registry.terraform.io/providers/vengtoo/vengtoo/latest/docs/resources/subject) | User, service, or device that can be granted access. |
-| [`vengtoo_role`](https://registry.terraform.io/providers/vengtoo/vengtoo/latest/docs/resources/role) | Named collection of policies for assigning to subjects or groups. |
-| [`vengtoo_group`](https://registry.terraform.io/providers/vengtoo/vengtoo/latest/docs/resources/group) | Tenant-wide collection of subjects for bulk role/policy assignment. |
+| [`vengtoo_role`](https://registry.terraform.io/providers/vengtoo/vengtoo/latest/docs/resources/role) | Named collection of policies for assigning to subjects. |
 | [`vengtoo_policy`](https://registry.terraform.io/providers/vengtoo/vengtoo/latest/docs/resources/policy) | ALLOW/DENY rule with priority and conditions. |
-| [`vengtoo_policy_assignment`](https://registry.terraform.io/providers/vengtoo/vengtoo/latest/docs/resources/policy_assignment) | Attach a policy to a role, subject, or group. |
+| [`vengtoo_policy_assignment`](https://registry.terraform.io/providers/vengtoo/vengtoo/latest/docs/resources/policy_assignment) | Attach a policy to a role or subject. |
 | [`vengtoo_role_assignment`](https://registry.terraform.io/providers/vengtoo/vengtoo/latest/docs/resources/role_assignment) | Attach a role to a subject. |
 
 ## Import
@@ -131,7 +129,6 @@ terraform import vengtoo_resource_type.doc    <resource-type-id>
 terraform import vengtoo_resource.wiki        <resource-id>
 terraform import vengtoo_subject.alice        <subject-id>
 terraform import vengtoo_role.editor          <role-id>
-terraform import vengtoo_group.engineering    <group-id>
 terraform import vengtoo_policy.my_policy     <policy-id>
 
 # Composite-ID resources

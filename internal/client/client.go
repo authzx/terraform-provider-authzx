@@ -368,33 +368,6 @@ func (c *Client) DeleteRole(ctx context.Context, id string) error {
 	return c.do(ctx, "DELETE", "/v1/roles/"+id, nil, nil)
 }
 
-type Group struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-}
-
-func (c *Client) CreateGroup(ctx context.Context, g *Group) (*Group, error) {
-	var result Group
-	err := c.do(ctx, "POST", "/v1/groups", g, &result)
-	return &result, err
-}
-
-func (c *Client) GetGroup(ctx context.Context, id string) (*Group, error) {
-	var result Group
-	err := c.do(ctx, "GET", "/v1/groups/"+id, nil, &result)
-	return &result, err
-}
-
-func (c *Client) UpdateGroup(ctx context.Context, id string, g *Group) (*Group, error) {
-	var result Group
-	err := c.do(ctx, "PUT", "/v1/groups/"+id, g, &result)
-	return &result, err
-}
-
-func (c *Client) DeleteGroup(ctx context.Context, id string) error {
-	return c.do(ctx, "DELETE", "/v1/groups/"+id, nil, nil)
-}
 
 type PolicyResourceRef struct {
 	ResourceID string   `json:"resource_id"`
@@ -409,10 +382,12 @@ type PolicyResourceTypeRef struct {
 // PolicyCondition is one structured entry inside a policy's conditions array.
 // The backend stores conditions as a JSONB blob; this shape matches what the
 // Rego evaluator (resources/authz.rego) reads:
-//   { type: "resource_attribute" | "subject_attribute" | "timeOfDay" | "ipAddress" | ... ,
-//     field: "<attribute-path>",   (only for *_attribute types)
-//     operator: "eq"|"neq"|"lt"|"gt"|"lte"|"gte"|"in"|"between"|"after"|"before"|... ,
-//     value: <polymorphic — scalar OR list depending on operator> }
+//
+//	{ type: "resource_attribute" | "subject_attribute" | "timeOfDay" | "ipAddress" | ... ,
+//	  field: "<attribute-path>",   (only for *_attribute types)
+//	  operator: "eq"|"neq"|"lt"|"gt"|"lte"|"gte"|"in"|"between"|"after"|"before"|... ,
+//	  value: <polymorphic — scalar OR list depending on operator> }
+//
 // Because the value is polymorphic, the TF provider surfaces it as a
 // JSON-encoded string (ValueJSON) and (de)serializes transparently.
 type PolicyCondition struct {
@@ -423,16 +398,15 @@ type PolicyCondition struct {
 }
 
 type Policy struct {
-	ID             string                  `json:"id"`
-	Name           string                  `json:"name"`
-	Description    string                  `json:"description,omitempty"`
-	Effect         string                  `json:"effect"`
-	Resources      []PolicyResourceRef     `json:"resources"`
-	ResourceTypes  []PolicyResourceTypeRef `json:"resource_types,omitempty"`
-	Priority       int                     `json:"priority,omitempty"`
-	Actions        []string                `json:"actions,omitempty"`
-	ApplicationIDs []string                `json:"application_ids,omitempty"`
-	Conditions     []PolicyCondition       `json:"conditions,omitempty"`
+	ID            string                  `json:"id"`
+	Name          string                  `json:"name"`
+	Description   string                  `json:"description,omitempty"`
+	Effect        string                  `json:"effect"`
+	Resources     []PolicyResourceRef     `json:"resources"`
+	ResourceTypes []PolicyResourceTypeRef `json:"resource_types,omitempty"`
+	Priority      int                     `json:"priority,omitempty"`
+	Actions       []string                `json:"actions,omitempty"`
+	Conditions    []PolicyCondition       `json:"conditions,omitempty"`
 }
 
 func (c *Client) CreatePolicy(ctx context.Context, p *Policy) (*Policy, error) {
@@ -465,20 +439,6 @@ func (c *Client) GetPolicy(ctx context.Context, id string) (*Policy, error) {
 			}
 		}
 		result.Resources = refs
-	}
-
-	// The primary endpoint also does not return application_ids (the field is
-	// json:"-" on the backend model). Fetch from the dedicated endpoint.
-	type policyAppResp struct {
-		ApplicationID string `json:"application_id"`
-	}
-	var apps []policyAppResp
-	if err := c.do(ctx, "GET", "/v1/policies/"+id+"/applications", nil, &apps); err == nil {
-		ids := make([]string, len(apps))
-		for i, a := range apps {
-			ids[i] = a.ApplicationID
-		}
-		result.ApplicationIDs = ids
 	}
 
 	// Resource-type targets live in a separate join table.
@@ -515,6 +475,8 @@ type PolicyAssignment struct {
 	PolicyIDs  []string `json:"policy_ids"`
 	EntityType string   `json:"entity_type"`
 	EntityID   string   `json:"entity_id"`
+	StartsAt   *string  `json:"starts_at,omitempty"`
+	ExpiresAt  *string  `json:"expires_at,omitempty"`
 }
 
 func (c *Client) AssignPolicy(ctx context.Context, a *PolicyAssignment) error {

@@ -21,6 +21,8 @@ type policyAssignmentModel struct {
 	PolicyID   types.String `tfsdk:"policy_id"`
 	EntityType types.String `tfsdk:"entity_type"`
 	EntityID   types.String `tfsdk:"entity_id"`
+	StartsAt   types.String `tfsdk:"starts_at"`
+	ExpiresAt  types.String `tfsdk:"expires_at"`
 }
 
 func NewPolicyAssignmentResource() resource.Resource {
@@ -33,7 +35,7 @@ func (r *policyAssignmentResource) Metadata(_ context.Context, req resource.Meta
 
 func (r *policyAssignmentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Assigns a policy to a role, subject, or group. Deleting this resource unassigns the policy.",
+		Description: "Assigns a policy to a role, subject, or group, with an optional time window. Deleting this resource unassigns the policy.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:    true,
@@ -63,6 +65,20 @@ func (r *policyAssignmentResource) Schema(_ context.Context, _ resource.SchemaRe
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"starts_at": schema.StringAttribute{
+				Optional:    true,
+				Description: "RFC3339 timestamp when the assignment becomes active. If omitted, the assignment is active immediately.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"expires_at": schema.StringAttribute{
+				Optional:    true,
+				Description: "RFC3339 timestamp when the assignment expires. If omitted, the assignment does not expire.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
 		},
 	}
 }
@@ -80,12 +96,21 @@ func (r *policyAssignmentResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	err := r.client.AssignPolicy(ctx, &client.PolicyAssignment{
+	assignment := &client.PolicyAssignment{
 		PolicyIDs:  []string{plan.PolicyID.ValueString()},
 		EntityType: plan.EntityType.ValueString(),
 		EntityID:   plan.EntityID.ValueString(),
-	})
-	if err != nil {
+	}
+	if !plan.StartsAt.IsNull() && !plan.StartsAt.IsUnknown() {
+		v := plan.StartsAt.ValueString()
+		assignment.StartsAt = &v
+	}
+	if !plan.ExpiresAt.IsNull() && !plan.ExpiresAt.IsUnknown() {
+		v := plan.ExpiresAt.ValueString()
+		assignment.ExpiresAt = &v
+	}
+
+	if err := r.client.AssignPolicy(ctx, assignment); err != nil {
 		resp.Diagnostics.AddError("Failed to assign policy", err.Error())
 		return
 	}
@@ -95,8 +120,7 @@ func (r *policyAssignmentResource) Create(ctx context.Context, req resource.Crea
 }
 
 func (r *policyAssignmentResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	// The assignment is implicit — if the policy and entity still exist, the assignment exists.
-	// No separate read endpoint for a single assignment.
+	// The assignment API has no single-assignment read endpoint; state is authoritative.
 	var state policyAssignmentModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -116,12 +140,11 @@ func (r *policyAssignmentResource) Delete(ctx context.Context, req resource.Dele
 		return
 	}
 
-	err := r.client.UnassignPolicy(ctx,
+	if err := r.client.UnassignPolicy(ctx,
 		state.EntityType.ValueString(),
 		state.EntityID.ValueString(),
 		state.PolicyID.ValueString(),
-	)
-	if err != nil {
+	); err != nil {
 		resp.Diagnostics.AddError("Failed to unassign policy", err.Error())
 	}
 }
@@ -138,6 +161,8 @@ func (r *policyAssignmentResource) ImportState(ctx context.Context, req resource
 		EntityType: types.StringValue(parts[0]),
 		EntityID:   types.StringValue(parts[1]),
 		PolicyID:   types.StringValue(parts[2]),
+		StartsAt:   types.StringNull(),
+		ExpiresAt:  types.StringNull(),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.0 — 2026-06-25
+
+### Removed
+
+- `vengtoo_group` resource — groups are no longer part of the Vengtoo model. Assign policies directly to subjects or via roles (`vengtoo_role_assignment`).
+
 ## v0.2.0 — 2026-04-18
 
 ### Breaking changes

@@ -124,7 +124,6 @@ func (p *vengtooProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewResourceResource,
 		NewSubjectResource,
 		NewRoleResource,
-		NewGroupResource,
 		NewPolicyResource,
 		NewPolicyAssignmentResource,
 		NewRoleAssignmentResource,
