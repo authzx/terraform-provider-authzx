@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 )
 
 type resourceTypeResource struct {
@@ -17,10 +17,10 @@ type resourceTypeResource struct {
 }
 
 type resourceTypeModel struct {
-	ID            types.String `tfsdk:"id"`
-	Name          types.String `tfsdk:"name"`
-	Description   types.String `tfsdk:"description"`
-	Actions       types.List   `tfsdk:"actions"`
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
+	Actions     types.List   `tfsdk:"actions"`
 }
 
 func NewResourceTypeResource() resource.Resource {
@@ -179,10 +179,10 @@ func (r *resourceTypeResource) ImportState(ctx context.Context, req resource.Imp
 	resp.Diagnostics.Append(diags...)
 
 	state := resourceTypeModel{
-		ID:            types.StringValue(rt.ID),
-		Name:          types.StringValue(rt.Name),
-		Description:   stringOrNull(rt.Description),
-		Actions:       actionsList,
+		ID:          types.StringValue(rt.ID),
+		Name:        types.StringValue(rt.Name),
+		Description: stringOrNull(rt.Description),
+		Actions:     actionsList,
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

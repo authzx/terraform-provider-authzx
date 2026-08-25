@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 )
 
 type roleResource struct {
@@ -17,9 +17,9 @@ type roleResource struct {
 }
 
 type roleModel struct {
-	ID            types.String `tfsdk:"id"`
-	Name          types.String `tfsdk:"name"`
-	Description   types.String `tfsdk:"description"`
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
 }
 
 func NewRoleResource() resource.Resource {
@@ -67,8 +67,8 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	role, err := r.client.CreateRole(ctx, &client.Role{
-		Name:           plan.Name.ValueString(),
-		Description:    plan.Description.ValueString(),
+		Name:        plan.Name.ValueString(),
+		Description: plan.Description.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create role", err.Error())
@@ -107,8 +107,8 @@ func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	_, err := r.client.UpdateRole(ctx, state.ID.ValueString(), &client.Role{
-		Name:           plan.Name.ValueString(),
-		Description:    plan.Description.ValueString(),
+		Name:        plan.Name.ValueString(),
+		Description: plan.Description.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update role", err.Error())
@@ -139,9 +139,9 @@ func (r *roleResource) ImportState(ctx context.Context, req resource.ImportState
 	}
 
 	state := roleModel{
-		ID:            types.StringValue(role.ID),
-		Name:          types.StringValue(role.Name),
-		Description:   stringOrNull(role.Description),
+		ID:          types.StringValue(role.ID),
+		Name:        types.StringValue(role.Name),
+		Description: stringOrNull(role.Description),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

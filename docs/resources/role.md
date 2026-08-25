@@ -11,9 +11,8 @@ A role groups permissions together. Assign policies to roles, then assign roles 
 
 ```terraform
 resource "vengtoo_role" "editor" {
-  application_id = vengtoo_application.example.id
-  name           = "editor"
-  description    = "Can read and write documents"
+  name        = "editor"
+  description = "Can read and write documents"
 }
 ```
 
@@ -23,7 +22,6 @@ resource "vengtoo_role" "editor" {
 ### Required
 
 - `name` (String) Role name (e.g., admin, editor, viewer).
-- `namespace_id` (String) Namespace this role belongs to.
 
 ### Optional
 

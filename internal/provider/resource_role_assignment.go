@@ -4,12 +4,12 @@ import (
 	"context"
 	"strings"
 
-	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 )
 
 type roleAssignmentResource struct {

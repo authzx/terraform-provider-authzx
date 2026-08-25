@@ -11,9 +11,8 @@ A subject is an actor in your system — a user, service, or device that perform
 
 ```terraform
 resource "vengtoo_subject" "alice" {
-  application_id = vengtoo_application.example.id
-  name           = "Alice"
-  type           = "user"
+  name = "Alice"
+  type = "user"
 }
 ```
 
@@ -23,8 +22,7 @@ resource "vengtoo_subject" "alice" {
 ### Required
 
 - `name` (String) Subject name.
-- `namespace_id` (String) Namespace this subject belongs to.
-- `type` (String) Subject type (e.g., user, service, device).
+- `type` (String) Subject type: one of user, service, device, custom, ai_agent.
 
 ### Optional
 

@@ -11,10 +11,9 @@ A resource type defines a category of things you want to protect, along with the
 
 ```terraform
 resource "vengtoo_resource_type" "document" {
-  application_id = vengtoo_application.example.id
-  name           = "document"
-  description    = "Documents and files"
-  actions        = ["read", "write", "delete", "share"]
+  name        = "document"
+  description = "Documents and files"
+  actions     = ["read", "write", "delete", "share"]
 }
 ```
 
@@ -25,7 +24,6 @@ resource "vengtoo_resource_type" "document" {
 
 - `actions` (List of String) Available actions (e.g., read, write, delete).
 - `name` (String) Resource type name (e.g., document, api-endpoint).
-- `namespace_id` (String) Namespace this resource type belongs to.
 
 ### Optional
 

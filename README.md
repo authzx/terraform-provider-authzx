@@ -25,13 +25,13 @@ Run `terraform init` to download the provider.
 
 ## Authentication
 
-The provider uses the OAuth 2.0 Client Credentials flow. Create an OAuth client from the Vengtoo console (**Settings → API → OAuth Clients**). Client secrets are prefixed with `azx_cs_`.
+The provider uses the OAuth 2.0 Client Credentials flow. Create an OAuth client from the Vengtoo console (**Settings → API → OAuth Clients**). Client secrets are prefixed with `vgt_cs_`.
 
 The simplest setup — export env vars and leave the provider block empty:
 
 ```bash
 export VENGTOO_CLIENT_ID="client_..."
-export VENGTOO_CLIENT_SECRET="azx_cs_..."
+export VENGTOO_CLIENT_SECRET="vgt_cs_..."
 ```
 
 Or set them explicitly in the provider block:
@@ -39,7 +39,7 @@ Or set them explicitly in the provider block:
 ```hcl
 provider "vengtoo" {
   client_id     = "client_..."
-  client_secret = "azx_cs_..."
+  client_secret = "vgt_cs_..."
   # endpoint    = "https://api.vengtoo.com"   # optional; or VENGTOO_ENDPOINT env var
 }
 ```

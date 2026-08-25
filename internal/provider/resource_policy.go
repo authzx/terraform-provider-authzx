@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -13,7 +13,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 )
 
 type policyResource struct {
@@ -29,7 +32,7 @@ type policyModel struct {
 	ResourceTypes types.List   `tfsdk:"resource_types"`
 	Priority      types.Int64  `tfsdk:"priority"`
 	Actions       types.List   `tfsdk:"actions"`
-	Conditions    types.List   `tfsdk:"conditions"`
+	Conditions    types.Object `tfsdk:"conditions"`
 }
 
 type policyResourceRefModel struct {
@@ -42,15 +45,32 @@ type policyResourceTypeRefModel struct {
 	Actions        types.List   `tfsdk:"actions"`
 }
 
-// policyConditionModel mirrors client.PolicyCondition. Value is surfaced as a
-// JSON-encoded string because the underlying value is polymorphic (number,
-// string, bool, array) and a single TF attribute type can't express that
-// cleanly without types.Dynamic. Users write `value_json = jsonencode(100)`.
-type policyConditionModel struct {
-	Type      types.String `tfsdk:"type"`
-	Field     types.String `tfsdk:"field"`
-	Operator  types.String `tfsdk:"operator"`
+// attrCheckModel is one {key, op, value} check. value_json is JSON-encoded
+// because the value is polymorphic; users write `value_json = jsonencode(100)`.
+type attrCheckModel struct {
+	Key       types.String `tfsdk:"key"`
+	Op        types.String `tfsdk:"op"`
 	ValueJSON types.String `tfsdk:"value_json"`
+}
+
+type conditionsModel struct {
+	SubjectAttrs  types.List `tfsdk:"subject_attrs"`
+	ResourceAttrs types.List `tfsdk:"resource_attrs"`
+	ContextAttrs  types.List `tfsdk:"context_attrs"`
+}
+
+var attrCheckAttrTypes = map[string]attr.Type{
+	"key":        types.StringType,
+	"op":         types.StringType,
+	"value_json": types.StringType,
+}
+
+var attrCheckListType = types.ListType{ElemType: types.ObjectType{AttrTypes: attrCheckAttrTypes}}
+
+var conditionsAttrTypes = map[string]attr.Type{
+	"subject_attrs":  attrCheckListType,
+	"resource_attrs": attrCheckListType,
+	"context_attrs":  attrCheckListType,
 }
 
 func NewPolicyResource() resource.Resource {
@@ -131,28 +151,13 @@ func (r *policyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
-			"conditions": schema.ListNestedAttribute{
+			"conditions": schema.SingleNestedAttribute{
 				Optional:    true,
-				Description: "Structured ABAC conditions evaluated when this policy matches. All conditions must pass (AND semantics). Applies to both ALLOW and DENY policies.",
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"type": schema.StringAttribute{
-							Required:    true,
-							Description: "Condition type: resource_attribute, subject_attribute, timeOfDay, ipAddress, geolocation, environment.",
-						},
-						"field": schema.StringAttribute{
-							Optional:    true,
-							Description: "Attribute key (for resource_attribute and subject_attribute types). The condition reads input.{resource|subject}.attributes.<field>.",
-						},
-						"operator": schema.StringAttribute{
-							Required:    true,
-							Description: "Comparison operator. For *_attribute types: eq, neq, lt, gt, lte, gte, in. For other types: see docs.",
-						},
-						"value_json": schema.StringAttribute{
-							Required:    true,
-							Description: "Comparison value, JSON-encoded. Use jsonencode(100) for numbers, jsonencode(\"finance\") for strings, jsonencode([\"a\", \"b\"]) for lists — polymorphic to match the Rego evaluator's value slot.",
-						},
-					},
+				Description: "Structured ABAC conditions (AND semantics), matched on subject, resource, and request-context attributes. Advanced guards (time windows, MFA, trust level, geo, rate limits, human approval, expression trees) are managed via the API, not Terraform.",
+				Attributes: map[string]schema.Attribute{
+					"subject_attrs":  attrChecksSchema("subject"),
+					"resource_attrs": attrChecksSchema("resource"),
+					"context_attrs":  attrChecksSchema("request context"),
 				},
 			},
 		},
@@ -165,67 +170,123 @@ func (r *policyResource) Configure(_ context.Context, req resource.ConfigureRequ
 	}
 }
 
-// toClientConditions converts the TF-side conditions list into the client's
-// []PolicyCondition. value_json strings are decoded as json.RawMessage so the
-// polymorphic value (number, string, bool, array) round-trips to the backend.
-func toClientConditions(ctx context.Context, l types.List) ([]client.PolicyCondition, error) {
+// attrChecksSchema is the nested schema for one {key, op, value_json} array.
+func attrChecksSchema(scope string) schema.ListNestedAttribute {
+	return schema.ListNestedAttribute{
+		Optional:    true,
+		Description: "Attribute checks against the " + scope + " (all must pass).",
+		NestedObject: schema.NestedAttributeObject{
+			Attributes: map[string]schema.Attribute{
+				"key": schema.StringAttribute{
+					Required:    true,
+					Description: "Attribute key.",
+				},
+				"op": schema.StringAttribute{
+					Required:    true,
+					Description: "Operator: eq, ne, gt, gte, lt, lte, in, not_in, matches.",
+					Validators: []validator.String{
+						stringvalidator.OneOf("eq", "ne", "gt", "gte", "lt", "lte", "in", "not_in", "matches"),
+					},
+				},
+				"value_json": schema.StringAttribute{
+					Required:    true,
+					Description: "Comparison value, JSON-encoded: jsonencode(100), jsonencode(\"finance\"), jsonencode([\"a\", \"b\"]).",
+				},
+			},
+		},
+	}
+}
+
+// toClientConditions converts the TF conditions object into the API's typed
+// PolicyConditions. Returns nil when no attribute checks are set.
+func toClientConditions(ctx context.Context, o types.Object) (*client.PolicyConditions, error) {
+	if o.IsNull() || o.IsUnknown() {
+		return nil, nil
+	}
+	var m conditionsModel
+	if diags := o.As(ctx, &m, basetypes.ObjectAsOptions{}); diags.HasError() {
+		return nil, fmt.Errorf("failed to parse conditions: %s", diags.Errors())
+	}
+	subj, err := toAttrChecks(ctx, m.SubjectAttrs, "subject_attrs")
+	if err != nil {
+		return nil, err
+	}
+	res, err := toAttrChecks(ctx, m.ResourceAttrs, "resource_attrs")
+	if err != nil {
+		return nil, err
+	}
+	cx, err := toAttrChecks(ctx, m.ContextAttrs, "context_attrs")
+	if err != nil {
+		return nil, err
+	}
+	if len(subj) == 0 && len(res) == 0 && len(cx) == 0 {
+		return nil, nil
+	}
+	return &client.PolicyConditions{SubjectAttrs: subj, ResourceAttrs: res, ContextAttrs: cx}, nil
+}
+
+func toAttrChecks(ctx context.Context, l types.List, name string) ([]client.AttrCheck, error) {
 	if l.IsNull() || l.IsUnknown() {
 		return nil, nil
 	}
-	var items []policyConditionModel
-	diags := l.ElementsAs(ctx, &items, false)
-	if diags.HasError() {
-		return nil, fmt.Errorf("failed to parse conditions: %s", diags.Errors())
+	var items []attrCheckModel
+	if diags := l.ElementsAs(ctx, &items, false); diags.HasError() {
+		return nil, fmt.Errorf("failed to parse %s: %s", name, diags.Errors())
 	}
-	out := make([]client.PolicyCondition, len(items))
+	out := make([]client.AttrCheck, len(items))
 	for i, c := range items {
 		raw := c.ValueJSON.ValueString()
 		if raw == "" {
 			raw = "null"
 		}
-		// Validate it's well-formed JSON now so we fail at plan rather than a
-		// confusing 500 from the backend later.
 		if !json.Valid([]byte(raw)) {
-			return nil, fmt.Errorf("conditions[%d].value_json is not valid JSON: %s", i, raw)
+			return nil, fmt.Errorf("%s[%d].value_json is not valid JSON: %s", name, i, raw)
 		}
-		out[i] = client.PolicyCondition{
-			Type:     c.Type.ValueString(),
-			Field:    c.Field.ValueString(),
-			Operator: c.Operator.ValueString(),
-			Value:    json.RawMessage(raw),
-		}
+		out[i] = client.AttrCheck{Key: c.Key.ValueString(), Op: c.Op.ValueString(), Value: json.RawMessage(raw)}
 	}
 	return out, nil
 }
 
-// conditionsToList converts the client's []PolicyCondition back into a TF list
-// for Read. Preserves the value's JSON shape exactly.
-func conditionsToList(ctx context.Context, conds []client.PolicyCondition) (types.List, diag.Diagnostics) {
-	attrTypes := map[string]attr.Type{
-		"type":       types.StringType,
-		"field":      types.StringType,
-		"operator":   types.StringType,
-		"value_json": types.StringType,
+// conditionsToObject converts the API's PolicyConditions back into the TF
+// object for Read, preserving each value's JSON shape.
+func conditionsToObject(ctx context.Context, c *client.PolicyConditions) (types.Object, diag.Diagnostics) {
+	if c == nil || (len(c.SubjectAttrs) == 0 && len(c.ResourceAttrs) == 0 && len(c.ContextAttrs) == 0) {
+		return types.ObjectNull(conditionsAttrTypes), nil
 	}
-	objType := types.ObjectType{AttrTypes: attrTypes}
-	if len(conds) == 0 {
+	var diags diag.Diagnostics
+	subj, d := attrChecksToList(ctx, c.SubjectAttrs)
+	diags.Append(d...)
+	res, d := attrChecksToList(ctx, c.ResourceAttrs)
+	diags.Append(d...)
+	cx, d := attrChecksToList(ctx, c.ContextAttrs)
+	diags.Append(d...)
+	if diags.HasError() {
+		return types.ObjectNull(conditionsAttrTypes), diags
+	}
+	obj, d := types.ObjectValue(conditionsAttrTypes, map[string]attr.Value{
+		"subject_attrs":  subj,
+		"resource_attrs": res,
+		"context_attrs":  cx,
+	})
+	diags.Append(d...)
+	return obj, diags
+}
+
+func attrChecksToList(ctx context.Context, checks []client.AttrCheck) (types.List, diag.Diagnostics) {
+	objType := types.ObjectType{AttrTypes: attrCheckAttrTypes}
+	if len(checks) == 0 {
 		return types.ListNull(objType), nil
 	}
-	items := make([]policyConditionModel, len(conds))
-	for i, c := range conds {
-		field := types.StringNull()
-		if c.Field != "" {
-			field = types.StringValue(c.Field)
-		}
-		valueJSON := "null"
+	items := make([]attrCheckModel, len(checks))
+	for i, c := range checks {
+		vj := "null"
 		if len(c.Value) > 0 {
-			valueJSON = string(c.Value)
+			vj = string(c.Value)
 		}
-		items[i] = policyConditionModel{
-			Type:      types.StringValue(c.Type),
-			Field:     field,
-			Operator:  types.StringValue(c.Operator),
-			ValueJSON: types.StringValue(valueJSON),
+		items[i] = attrCheckModel{
+			Key:       types.StringValue(c.Key),
+			Op:        types.StringValue(c.Op),
+			ValueJSON: types.StringValue(vj),
 		}
 	}
 	return types.ListValueFrom(ctx, objType, items)
@@ -400,7 +461,7 @@ func (r *policyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	// Conditions — polymorphic value, stored as value_json per element.
-	conditionsList, diags := conditionsToList(ctx, policy.Conditions)
+	conditionsList, diags := conditionsToObject(ctx, policy.Conditions)
 	resp.Diagnostics.Append(diags...)
 	state.Conditions = conditionsList
 
@@ -491,7 +552,7 @@ func (r *policyResource) ImportState(ctx context.Context, req resource.ImportSta
 	rtList, diags := resourceTypesToList(ctx, policy.ResourceTypes)
 	resp.Diagnostics.Append(diags...)
 
-	conditionsList, diags := conditionsToList(ctx, policy.Conditions)
+	conditionsList, diags := conditionsToObject(ctx, policy.Conditions)
 	resp.Diagnostics.Append(diags...)
 
 	var actionsList types.List
@@ -542,4 +603,3 @@ func resourcesToList(ctx context.Context, resources []client.PolicyResourceRef) 
 	list, diags := types.ListValue(elemType, elems)
 	return list, diags
 }
-

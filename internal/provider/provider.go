@@ -5,12 +5,12 @@ import (
 	"errors"
 	"os"
 
-	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 )
 
 const defaultEndpoint = "https://api.vengtoo.com"
@@ -125,11 +125,25 @@ func (p *vengtooProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewSubjectResource,
 		NewRoleResource,
 		NewPolicyResource,
+		NewGroupResource,
+		NewSubjectAttributeResource,
 		NewPolicyAssignmentResource,
 		NewRoleAssignmentResource,
+		NewGroupMembershipResource,
+		NewGroupRoleAssignmentResource,
+		NewGroupParentResource,
+		NewRoleParentResource,
 	}
 }
 
 func (p *vengtooProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return nil
+	return []func() datasource.DataSource{
+		NewSubjectDataSource,
+		NewResourceDataSource,
+		NewResourceTypeDataSource,
+		NewNamespaceDataSource,
+		NewRoleDataSource,
+		NewPolicyDataSource,
+		NewGroupDataSource,
+	}
 }

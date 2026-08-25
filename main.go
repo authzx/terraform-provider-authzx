@@ -6,8 +6,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/vengtoo/terraform-provider-vengtoo/internal/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/vengtoo/terraform-provider-vengtoo/internal/provider"
 )
 
 func main() {

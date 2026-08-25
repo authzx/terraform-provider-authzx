@@ -18,13 +18,13 @@ Manages an Vengtoo resource — a specific instance of a resource type.
 ### Required
 
 - `name` (String) Resource name.
-- `namespace_id` (String) Namespace this resource belongs to.
 - `type` (String) Resource type ID.
 
 ### Optional
 
 - `description` (String) Resource description.
 - `external_id` (String) Your system's reference ID.
+- `namespace_id` (String) Namespace this resource belongs to. Omit to use the tenant's default namespace.
 
 ### Read-Only
 

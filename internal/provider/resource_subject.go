@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 )
 
 type subjectResource struct {
@@ -17,10 +19,10 @@ type subjectResource struct {
 }
 
 type subjectModel struct {
-	ID            types.String `tfsdk:"id"`
-	Name          types.String `tfsdk:"name"`
-	Type          types.String `tfsdk:"type"`
-	ExternalID  types.String `tfsdk:"external_id"`
+	ID         types.String `tfsdk:"id"`
+	Name       types.String `tfsdk:"name"`
+	Type       types.String `tfsdk:"type"`
+	ExternalID types.String `tfsdk:"external_id"`
 }
 
 func NewSubjectResource() resource.Resource {
@@ -33,7 +35,7 @@ func (r *subjectResource) Metadata(_ context.Context, req resource.MetadataReque
 
 func (r *subjectResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages an Vengtoo subject (user, service, device).",
+		Description: "Manages a Vengtoo subject (an entity: user, service, device, custom, or ai_agent). Best for static/system identities and seed data; provision end-users via the API or SCIM.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:    true,
@@ -48,7 +50,10 @@ func (r *subjectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			},
 			"type": schema.StringAttribute{
 				Required:    true,
-				Description: "Subject type (e.g., user, service, device).",
+				Description: "Subject type: one of user, service, device, custom, ai_agent.",
+				Validators: []validator.String{
+					stringvalidator.OneOf("user", "service", "device", "custom", "ai_agent"),
+				},
 			},
 			"external_id": schema.StringAttribute{
 				Optional:    true,
@@ -82,9 +87,9 @@ func (r *subjectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	s, err := r.client.CreateSubject(ctx, &client.Subject{
-		Name:           plan.Name.ValueString(),
-		Type:           plan.Type.ValueString(),
-		ExternalID:     plan.ExternalID.ValueString(),
+		Name:       plan.Name.ValueString(),
+		Type:       plan.Type.ValueString(),
+		ExternalID: plan.ExternalID.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create subject", err.Error())
@@ -124,9 +129,9 @@ func (r *subjectResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	_, err := r.client.UpdateSubject(ctx, state.ID.ValueString(), &client.Subject{
-		Name:           plan.Name.ValueString(),
-		Type:           plan.Type.ValueString(),
-		ExternalID:     plan.ExternalID.ValueString(),
+		Name:       plan.Name.ValueString(),
+		Type:       plan.Type.ValueString(),
+		ExternalID: plan.ExternalID.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update subject", err.Error())
@@ -157,10 +162,10 @@ func (r *subjectResource) ImportState(ctx context.Context, req resource.ImportSt
 	}
 
 	state := subjectModel{
-		ID:            types.StringValue(s.ID),
-		Name:          types.StringValue(s.Name),
-		Type:          types.StringValue(s.Type),
-		ExternalID:  stringOrNull(s.ExternalID),
+		ID:         types.StringValue(s.ID),
+		Name:       types.StringValue(s.Name),
+		Type:       types.StringValue(s.Type),
+		ExternalID: stringOrNull(s.ExternalID),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

@@ -3,12 +3,12 @@
 page_title: "vengtoo_policy_assignment Resource - vengtoo"
 subcategory: ""
 description: |-
-  Assigns a policy to a role, subject, or group. Deleting this resource unassigns the policy.
+  Assigns a policy to a role, subject, or group, with an optional time window. Deleting this resource unassigns the policy.
 ---
 
 # vengtoo_policy_assignment (Resource)
 
-Assigns a policy to a role, subject, or group. Deleting this resource unassigns the policy.
+Assigns a policy to a role, subject, or group, with an optional time window. Deleting this resource unassigns the policy.
 
 
 
@@ -20,6 +20,11 @@ Assigns a policy to a role, subject, or group. Deleting this resource unassigns 
 - `entity_id` (String) Target entity ID.
 - `entity_type` (String) Target entity type: role, entity, or group.
 - `policy_id` (String) Policy to assign.
+
+### Optional
+
+- `expires_at` (String) RFC3339 timestamp when the assignment expires. If omitted, the assignment does not expire.
+- `starts_at` (String) RFC3339 timestamp when the assignment becomes active. If omitted, the assignment is active immediately.
 
 ### Read-Only
 

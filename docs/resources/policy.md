@@ -10,14 +10,20 @@ A policy defines an authorization rule — which actions are allowed or denied o
 ## Example Usage
 
 ```terraform
+resource "vengtoo_resource_type" "document" {
+  name    = "document"
+  actions = ["read", "write"]
+}
+
 resource "vengtoo_policy" "editors_can_edit" {
-  application_id = vengtoo_application.example.id
-  name           = "editors-can-edit"
-  description    = "Editors can read and write documents"
-  effect         = "ALLOW"
-  actions        = ["read", "write"]
-  resource_type  = "document"
-  priority       = 50
+  name        = "editors-can-edit"
+  description = "Editors can read and write documents"
+  effect      = "ALLOW"
+
+  resource_types = [{
+    resource_type_id = vengtoo_resource_type.document.id
+    actions          = ["read", "write"]
+  }]
 }
 ```
 
@@ -29,14 +35,13 @@ resource "vengtoo_policy" "editors_can_edit" {
 - `description` (String) Policy description.
 - `effect` (String) Policy effect: ALLOW or DENY.
 - `name` (String) Policy name.
-- `namespace_id` (String) Namespace this policy belongs to.
 
 ### Optional
 
 - `actions` (List of String) Policy-level actions (e.g., read, write, delete). Used for app-wide policies.
-- `conditions` (Attributes List) Structured ABAC conditions evaluated when this policy matches. All conditions must pass (AND semantics). Applies to both ALLOW and DENY policies. (see [below for nested schema](#nestedatt--conditions))
-- `namespace_ids` (List of String) Namespace IDs this policy protects. All resources in these namespaces are covered.
+- `conditions` (Attributes) Structured ABAC conditions (AND semantics), matched on subject, resource, and request-context attributes. Advanced guards (time windows, MFA, trust level, geo, rate limits, human approval, expression trees) are managed via the API, not Terraform. (see [below for nested schema](#nestedatt--conditions))
 - `priority` (Number) Policy priority (0-100). Higher priority policies are evaluated first.
+- `resource_types` (Attributes List) Resource types and actions this policy applies to (type-level targeting — covers all resources of the type). (see [below for nested schema](#nestedatt--resource_types))
 - `resources` (Attributes List) Resources and actions this policy applies to. (see [below for nested schema](#nestedatt--resources))
 
 ### Read-Only
@@ -46,15 +51,50 @@ resource "vengtoo_policy" "editors_can_edit" {
 <a id="nestedatt--conditions"></a>
 ### Nested Schema for `conditions`
 
-Required:
-
-- `operator` (String) Comparison operator. For *_attribute types: eq, neq, lt, gt, lte, gte, in. For other types: see docs.
-- `type` (String) Condition type: resource_attribute, subject_attribute, timeOfDay, ipAddress, geolocation, environment.
-- `value_json` (String) Comparison value, JSON-encoded. Use jsonencode(100) for numbers, jsonencode("finance") for strings, jsonencode(["a", "b"]) for lists — polymorphic to match the Rego evaluator's value slot.
-
 Optional:
 
-- `field` (String) Attribute key (for resource_attribute and subject_attribute types). The condition reads input.{resource|subject}.attributes.<field>.
+- `context_attrs` (Attributes List) Attribute checks against the request context (all must pass). (see [below for nested schema](#nestedatt--conditions--context_attrs))
+- `resource_attrs` (Attributes List) Attribute checks against the resource (all must pass). (see [below for nested schema](#nestedatt--conditions--resource_attrs))
+- `subject_attrs` (Attributes List) Attribute checks against the subject (all must pass). (see [below for nested schema](#nestedatt--conditions--subject_attrs))
+
+<a id="nestedatt--conditions--context_attrs"></a>
+### Nested Schema for `conditions.context_attrs`
+
+Required:
+
+- `key` (String) Attribute key.
+- `op` (String) Operator: eq, ne, gt, gte, lt, lte, in, not_in, matches.
+- `value_json` (String) Comparison value, JSON-encoded: jsonencode(100), jsonencode("finance"), jsonencode(["a", "b"]).
+
+
+<a id="nestedatt--conditions--resource_attrs"></a>
+### Nested Schema for `conditions.resource_attrs`
+
+Required:
+
+- `key` (String) Attribute key.
+- `op` (String) Operator: eq, ne, gt, gte, lt, lte, in, not_in, matches.
+- `value_json` (String) Comparison value, JSON-encoded: jsonencode(100), jsonencode("finance"), jsonencode(["a", "b"]).
+
+
+<a id="nestedatt--conditions--subject_attrs"></a>
+### Nested Schema for `conditions.subject_attrs`
+
+Required:
+
+- `key` (String) Attribute key.
+- `op` (String) Operator: eq, ne, gt, gte, lt, lte, in, not_in, matches.
+- `value_json` (String) Comparison value, JSON-encoded: jsonencode(100), jsonencode("finance"), jsonencode(["a", "b"]).
+
+
+
+<a id="nestedatt--resource_types"></a>
+### Nested Schema for `resource_types`
+
+Required:
+
+- `actions` (List of String) Actions allowed/denied on this resource type.
+- `resource_type_id` (String) Resource type ID.
 
 
 <a id="nestedatt--resources"></a>

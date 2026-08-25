@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/vengtoo/terraform-provider-vengtoo/internal/client"
 )
 
 type resourceResource struct {
@@ -17,12 +17,12 @@ type resourceResource struct {
 }
 
 type resourceModel struct {
-	ID            types.String `tfsdk:"id"`
-	Name          types.String `tfsdk:"name"`
-	Description   types.String `tfsdk:"description"`
-	Type          types.String `tfsdk:"type"`
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
+	Type        types.String `tfsdk:"type"`
 	NamespaceID types.String `tfsdk:"namespace_id"`
-	ExternalID    types.String `tfsdk:"external_id"`
+	ExternalID  types.String `tfsdk:"external_id"`
 }
 
 func NewResourceResource() resource.Resource {
@@ -170,12 +170,12 @@ func (r *resourceResource) ImportState(ctx context.Context, req resource.ImportS
 	}
 
 	state := resourceModel{
-		ID:            types.StringValue(res.ID),
-		Name:          types.StringValue(res.Name),
-		Description:   stringOrNull(res.Description),
-		Type:          types.StringValue(res.Type),
-		NamespaceID:   types.StringValue(res.ApplicationID),
-		ExternalID:    stringOrNull(res.ExternalID),
+		ID:          types.StringValue(res.ID),
+		Name:        types.StringValue(res.Name),
+		Description: stringOrNull(res.Description),
+		Type:        types.StringValue(res.Type),
+		NamespaceID: types.StringValue(res.ApplicationID),
+		ExternalID:  stringOrNull(res.ExternalID),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
